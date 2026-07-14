@@ -30,7 +30,6 @@ export function HRPage() {
 
   const fetchData = async () => {
     setLoading(true)
-    const today = toInputDate()
 
     const [empRes, attRes, payRes] = await Promise.all([
       supabase.from('employees').select('*').order('full_name'),
