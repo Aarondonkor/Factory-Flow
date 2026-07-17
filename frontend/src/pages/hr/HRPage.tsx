@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
 import type { Employee, Attendance, PayrollRecord } from '@/types/database'
-import { formatCurrency, formatDate, formatNumber, toInputDate } from '@/lib/format'
+import { formatCurrency, formatDate, formatNumber } from '@/lib/format'
 import { Card, StatCard } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ResponsiveTable, TableRow } from '@/components/ui/Table'
@@ -56,7 +56,11 @@ export function HRPage() {
   }, [])
 
   const activeEmployees = employees.filter((e) => e.is_active).length
-  const todayAttendance = attendance.filter((a) => a.attendance_date === toInputDate()).length
+  const today = new Date().toISOString().split('T')[0];
+
+  const todayAttendance = attendance.filter(
+    (a) => a.attendance_date === today
+  ).length;
 
   const tabs = [
     { id: 'employees' as const, label: 'Employees' },
