@@ -23,9 +23,12 @@ export interface RawMaterial {
   supplier_name: string | null
   supplier_contact: string | null
   last_restock_date: string | null
+  material_code: string | null
   created_at: string
   updated_at: string
 }
+
+export type ProductStage = 'semi_finished' | 'finished'
 
 export interface FinishedGood {
   id: string
@@ -36,6 +39,7 @@ export interface FinishedGood {
   unit: 'kg' | 'rolls'
   current_stock: number
   warehouse_location: string | null
+  stage: ProductStage
   created_at: string
   updated_at: string
 }
@@ -53,11 +57,26 @@ export interface StockMovement {
   created_at: string
 }
 
+export type MachineStage = 'extrusion' | 'conversion'
+
 export interface Machine {
   id: string
   machine_code: string
   name: string
   is_active: boolean
+  stage: MachineStage
+}
+
+export type ConversionProcessType = 'cutting' | 'printing'
+
+export interface ProductionRunMaterial {
+  id: string
+  production_run_id: string
+  raw_material_id: string
+  quantity_kg: number
+  proportion_pct: number | null
+  created_at: string
+  raw_materials?: RawMaterial
 }
 
 export interface ProductionRun {
@@ -66,6 +85,7 @@ export interface ProductionRun {
   shift: 'morning' | 'afternoon' | 'night'
   machine_id: string
   operator_name: string
+  supervisor_name: string | null
   finished_good_id: string | null
   film_thickness: number | null
   film_width: number | null
@@ -76,11 +96,55 @@ export interface ProductionRun {
   resin_consumed: number
   additive_material_id: string | null
   additive_consumed: number
+  input_product_id: string | null
+  input_quantity_consumed: number
+  process_type: ConversionProcessType | null
+
+  formula_code: string | null
+  roll_count: number | null
+  roll_length: number | null
+  avg_weight_per_roll: number | null
+  start_time: string | null
+  end_time: string | null
+  total_runtime_hours: number | null
+  downtime_hours: number
+
+  temp_z1: number | null
+  temp_z2: number | null
+  temp_z3: number | null
+  temp_z4: number | null
+  temp_z5: number | null
+  temp_z6: number | null
+  screw_speed_rpm: number | null
+  line_speed_mpm: number | null
+
+  cut_length_mm: number | null
+  bottom_seal_offset_mm: number | null
+  cutting_speed_cpm: number | null
+
+  print_colours_count: number | null
+  print_speed: number | null
+  print_tension: number | null
+  cleaned_rollers: boolean | null
+  roll_edges_ok: boolean | null
+  neatness_rating: number | null
+
+  samples_tested: number | null
+  samples_passed: number | null
+  samples_failed: number | null
+  qc_issues: string[] | null
+  qc_issue_other: string | null
+
+  batch_id: string | null
+  quality_grade: number | null
+
   waste_quantity: number
   notes: string | null
   created_at: string
   machines?: Machine
   finished_goods?: FinishedGood
+  input_product?: FinishedGood
+  production_run_materials?: ProductionRunMaterial[]
 }
 
 export interface MachineDowntime {

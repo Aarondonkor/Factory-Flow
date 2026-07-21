@@ -33,7 +33,9 @@ export function ProductionPage() {
     const [runsRes, dtRes, machRes, rawRes, finRes] = await Promise.all([
       supabase
         .from('production_runs')
-        .select('*, machines(machine_code, name), finished_goods(product_name)')
+        .select(
+          '*, machines(machine_code, name, stage), finished_goods(product_name, stage), input_product:finished_goods!production_runs_input_product_id_fkey(product_name), production_run_materials(quantity_kg, raw_materials(name))'
+        )
         .order('run_date', { ascending: false })
         .limit(50),
       supabase
@@ -64,7 +66,10 @@ export function ProductionPage() {
 
   const totalOutput = runs.reduce((sum, r) => sum + r.output_quantity, 0)
   const totalWaste = runs.reduce((sum, r) => sum + r.waste_quantity, 0)
-  const totalInput = runs.reduce((sum, r) => sum + r.resin_consumed + r.additive_consumed, 0)
+  const totalInput = runs.reduce(
+    (sum, r) => sum + (r.production_run_materials || []).reduce((s, m) => s + m.quantity_kg, 0),
+    0
+  )
   const yieldPercent = totalInput > 0 ? ((totalOutput / totalInput) * 100) : 0
   const wastePercent = totalInput > 0 ? ((totalWaste / totalInput) * 100) : 0
   const totalDowntimeHours = downtimes.reduce(
@@ -109,34 +114,45 @@ export function ProductionPage() {
       {tab === 'runs' && (
         <Card title="Production Runs">
           <ResponsiveTable
-            headers={['Date', 'Shift', 'Machine', 'Operator', 'Output', 'Resin', 'Waste']}
+            headers={['Date', 'Shift', 'Machine', 'Operator', 'Product', 'Output', 'Consumed', 'Waste']}
             isEmpty={runs.length === 0}
           >
-            {runs.map((r) => (
-              <TableRow
-                key={r.id}
-                cells={[
-                  formatDate(r.run_date),
-                  SHIFT_LABELS[r.shift],
-                  (r.machines as Machine)?.machine_code || '—',
-                  r.operator_name,
-                  `${formatNumber(r.output_quantity)} ${r.output_unit}`,
-                  `${formatNumber(r.resin_consumed)} kg`,
-                  `${formatNumber(r.waste_quantity)} kg`,
-                ]}
-                mobileCard={
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between font-medium">
-                      <span>{formatDate(r.run_date)} · {SHIFT_LABELS[r.shift]}</span>
-                      <span>{formatNumber(r.output_quantity)} {r.output_unit}</span>
+            {runs.map((r) => {
+              const isConversion = (r.machines as Machine)?.stage === 'conversion'
+              const materialsTotal = (r.production_run_materials || []).reduce((s, m) => s + m.quantity_kg, 0)
+              const consumedLabel = isConversion
+                ? `${formatNumber(r.input_quantity_consumed)} ${(r.input_product as FinishedGood)?.product_name || 'input'}`
+                : `${formatNumber(materialsTotal)} kg materials`
+              return (
+                <TableRow
+                  key={r.id}
+                  cells={[
+                    formatDate(r.run_date),
+                    SHIFT_LABELS[r.shift],
+                    (r.machines as Machine)?.machine_code || '—',
+                    r.operator_name,
+                    r.finished_goods?.product_name || '—',
+                    `${formatNumber(r.output_quantity)} ${r.output_unit}`,
+                    consumedLabel,
+                    `${formatNumber(r.waste_quantity)} kg`,
+                  ]}
+                  mobileCard={
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between font-medium">
+                        <span>{formatDate(r.run_date)} · {SHIFT_LABELS[r.shift]}</span>
+                        <span>{formatNumber(r.output_quantity)} {r.output_unit}</span>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        {(r.machines as Machine)?.name} · {r.operator_name}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {r.finished_goods?.product_name || '—'} {isConversion ? `← ${(r.input_product as FinishedGood)?.product_name || 'input'}` : ''}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-500">
-                      {(r.machines as Machine)?.name} · {r.operator_name}
-                    </p>
-                  </div>
-                }
-              />
-            ))}
+                  }
+                />
+              )
+            })}
           </ResponsiveTable>
         </Card>
       )}
