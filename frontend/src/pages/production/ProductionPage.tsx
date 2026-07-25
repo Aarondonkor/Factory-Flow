@@ -34,7 +34,7 @@ export function ProductionPage() {
       supabase
         .from('production_runs')
         .select(
-          '*, machines(machine_code, name, stage), finished_goods(product_name, stage), input_product:finished_goods!production_runs_input_product_id_fkey(product_name), production_run_materials(quantity_kg, raw_materials(name))'
+          '*, machines(machine_code, name, stage), finished_goods:finished_goods!production_runs_finished_good_id_fkey(product_name, stage), input_product:finished_goods!production_runs_input_product_id_fkey(product_name), production_run_materials(quantity_kg, raw_materials(name))'
         )
         .order('run_date', { ascending: false })
         .limit(50),
