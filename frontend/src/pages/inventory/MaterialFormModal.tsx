@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/stores/toastStore'
+import type { Customer } from '@/types/database'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -8,11 +9,12 @@ import { Button } from '@/components/ui/Button'
 
 interface MaterialFormModalProps {
   type: 'raw' | 'finished'
+  customers?: Customer[]
   onClose: () => void
   onSuccess: () => void
 }
 
-export function MaterialFormModal({ type, onClose, onSuccess }: MaterialFormModalProps) {
+export function MaterialFormModal({ type, customers = [], onClose, onSuccess }: MaterialFormModalProps) {
   const [loading, setLoading] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
 
@@ -30,9 +32,13 @@ export function MaterialFormModal({ type, onClose, onSuccess }: MaterialFormModa
     spec_thickness: '',
     spec_width: '',
     color: '',
-    unit: 'kg' as 'kg' | 'rolls',
+    unit: 'kg' as 'kg' | 'rolls' | 'bundle',
     current_stock: '0',
     warehouse_location: '',
+    stage: 'finished' as 'semi_finished' | 'finished',
+    customer_id: '',
+    unit_price: '',
+    bundle_size: '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,6 +65,10 @@ export function MaterialFormModal({ type, onClose, onSuccess }: MaterialFormModa
         unit: finForm.unit,
         current_stock: parseFloat(finForm.current_stock) || 0,
         warehouse_location: finForm.warehouse_location || null,
+        stage: finForm.stage,
+        customer_id: finForm.customer_id || null,
+        unit_price: finForm.unit_price ? parseFloat(finForm.unit_price) : null,
+        bundle_size: finForm.unit === 'bundle' && finForm.bundle_size ? parseInt(finForm.bundle_size, 10) : null,
       })
       if (error) addToast(error.message, 'error')
       else onSuccess()
@@ -141,16 +151,60 @@ export function MaterialFormModal({ type, onClose, onSuccess }: MaterialFormModa
               <Select
                 label="Unit"
                 value={finForm.unit}
-                onChange={(e) => setFinForm({ ...finForm, unit: e.target.value as 'kg' | 'rolls' })}
+                onChange={(e) => setFinForm({ ...finForm, unit: e.target.value as 'kg' | 'rolls' | 'bundle' })}
               >
                 <option value="kg">Kilograms (kg)</option>
                 <option value="rolls">Rolls</option>
+                <option value="bundle">Bundle</option>
               </Select>
               <Input
                 label="Warehouse Location"
                 value={finForm.warehouse_location}
                 onChange={(e) => setFinForm({ ...finForm, warehouse_location: e.target.value })}
               />
+            </div>
+
+            {finForm.unit === 'bundle' && (
+              <Input
+                label="Pieces per Bundle"
+                type="number"
+                value={finForm.bundle_size}
+                onChange={(e) => setFinForm({ ...finForm, bundle_size: e.target.value })}
+                placeholder="e.g. 100"
+              />
+            )}
+
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium text-slate-700 mb-3">Production Stage & Customer Ordering</p>
+              <div className="grid grid-cols-2 gap-4">
+                <Select
+                  label="Stage"
+                  value={finForm.stage}
+                  onChange={(e) => setFinForm({ ...finForm, stage: e.target.value as 'semi_finished' | 'finished' })}
+                >
+                  <option value="semi_finished">Semi-Finished (raw roll)</option>
+                  <option value="finished">Finished</option>
+                </Select>
+                <Input
+                  label="List Price (GHS, for online ordering)"
+                  type="number"
+                  step="0.01"
+                  value={finForm.unit_price}
+                  onChange={(e) => setFinForm({ ...finForm, unit_price: e.target.value })}
+                  placeholder="Leave blank to hide from customer portal"
+                />
+              </div>
+              <Select
+                label="Exclusive to Company"
+                className="mt-4"
+                value={finForm.customer_id}
+                onChange={(e) => setFinForm({ ...finForm, customer_id: e.target.value })}
+              >
+                <option value="">— Generally available to all customers —</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>{c.business_name || c.name} (branded product)</option>
+                ))}
+              </Select>
             </div>
           </>
         )}

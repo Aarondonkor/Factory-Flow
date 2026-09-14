@@ -47,6 +47,7 @@ export const ROLE_LABELS: Record<string, string> = {
   sales_staff: 'Sales Staff',
   hr_officer: 'HR Officer',
   staff: 'Staff / Worker',
+  customer: 'Customer',
 }
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {

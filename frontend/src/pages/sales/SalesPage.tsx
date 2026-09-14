@@ -59,6 +59,7 @@ export function SalesPage() {
 
   const totalRevenue = orders.reduce((s, o) => s + o.amount_paid, 0)
   const outstanding = orders.reduce((s, o) => s + o.balance_due, 0)
+  const pendingApprovals = customers.filter((c) => c.owner_profile_id && c.approval_status === 'pending').length
 
   const updateOrderStatus = async (orderId: string, status: string) => {
     const { error } = await supabase
@@ -74,6 +75,20 @@ export function SalesPage() {
     }
   }
 
+  const updateApprovalStatus = async (customerId: string, approval_status: 'approved' | 'rejected') => {
+    const { error } = await supabase
+      .from('customers')
+      .update({ approval_status })
+      .eq('id', customerId)
+
+    if (error) {
+      addToast(error.message, 'error')
+    } else {
+      addToast(`Company ${approval_status}`)
+      fetchData()
+    }
+  }
+
   const tabs = [
     { id: 'orders' as const, label: 'Orders' },
     { id: 'customers' as const, label: 'Customers' },
@@ -84,10 +99,11 @@ export function SalesPage() {
 
   return (
     <div className="page-shell space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Revenue" value={formatCurrency(totalRevenue)} />
         <StatCard label="Outstanding Balance" value={formatCurrency(outstanding)} alert={outstanding > 0} />
         <StatCard label="Total Orders" value={orders.length} />
+        <StatCard label="Pending Approvals" value={pendingApprovals} alert={pendingApprovals > 0} />
       </div>
 
       <PageTabs
@@ -164,7 +180,7 @@ export function SalesPage() {
       {tab === 'customers' && (
         <Card title="Customers">
           <ResponsiveTable
-            headers={['Name', 'Business', 'Phone', 'Email', 'Credit Terms']}
+            headers={['Name', 'Business', 'Phone', 'Email', 'Credit Terms', 'Account', 'Actions']}
             isEmpty={customers.length === 0}
           >
             {customers.map((c) => (
@@ -176,12 +192,62 @@ export function SalesPage() {
                   c.contact_phone || '—',
                   c.contact_email || '—',
                   c.credit_terms_days ? `${c.credit_terms_days} days` : 'Cash',
+                  c.owner_profile_id ? (
+                    <Badge
+                      variant={
+                        c.approval_status === 'approved'
+                          ? 'success'
+                          : c.approval_status === 'rejected'
+                          ? 'danger'
+                          : 'warning'
+                      }
+                    >
+                      Portal · {c.approval_status}
+                    </Badge>
+                  ) : (
+                    <Badge variant="default">Manual</Badge>
+                  ),
+                  canWrite && c.owner_profile_id && c.approval_status === 'pending' ? (
+                    <div className="flex gap-2 flex-wrap">
+                      <Button variant="secondary" onClick={() => updateApprovalStatus(c.id, 'approved')}>
+                        Approve
+                      </Button>
+                      <Button variant="danger" onClick={() => updateApprovalStatus(c.id, 'rejected')}>
+                        Reject
+                      </Button>
+                    </div>
+                  ) : null,
                 ]}
                 mobileCard={
                   <div className="space-y-1 text-sm">
-                    <p className="font-medium">{c.name}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">{c.name}</p>
+                      {c.owner_profile_id && (
+                        <Badge
+                          variant={
+                            c.approval_status === 'approved'
+                              ? 'success'
+                              : c.approval_status === 'rejected'
+                              ? 'danger'
+                              : 'warning'
+                          }
+                        >
+                          {c.approval_status}
+                        </Badge>
+                      )}
+                    </div>
                     {c.business_name && <p className="text-xs text-slate-500">{c.business_name}</p>}
                     <p className="text-xs">{c.contact_phone}</p>
+                    {canWrite && c.owner_profile_id && c.approval_status === 'pending' && (
+                      <div className="flex gap-2 pt-1">
+                        <Button variant="secondary" onClick={() => updateApprovalStatus(c.id, 'approved')}>
+                          Approve
+                        </Button>
+                        <Button variant="danger" onClick={() => updateApprovalStatus(c.id, 'rejected')}>
+                          Reject
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 }
               />

@@ -4,6 +4,7 @@ export type UserRole =
   | 'sales_staff'
   | 'hr_officer'
   | 'staff'
+  | 'customer'
 
 export interface Profile {
   id: string
@@ -36,10 +37,13 @@ export interface FinishedGood {
   spec_thickness: number | null
   spec_width: number | null
   color: string | null
-  unit: 'kg' | 'rolls'
+  unit: 'kg' | 'rolls' | 'bundle'
   current_stock: number
   warehouse_location: string | null
   stage: ProductStage
+  customer_id: string | null
+  unit_price: number | null
+  bundle_size: number | null
   created_at: string
   updated_at: string
 }
@@ -158,6 +162,8 @@ export interface MachineDowntime {
   machines?: Machine
 }
 
+export type CustomerApprovalStatus = 'pending' | 'approved' | 'rejected'
+
 export interface Customer {
   id: string
   name: string
@@ -166,6 +172,8 @@ export interface Customer {
   contact_email: string | null
   address: string | null
   credit_terms_days: number
+  owner_profile_id: string | null
+  approval_status: CustomerApprovalStatus
   created_at: string
 }
 
@@ -269,4 +277,15 @@ export interface DashboardMetrics {
   outstandingBalance: number
   activeEmployees: number
   todayAttendance: number
+}
+
+export interface Notification {
+  id: string
+  profile_id: string
+  type: string
+  title: string
+  message: string
+  order_id: string | null
+  is_read: boolean
+  created_at: string
 }

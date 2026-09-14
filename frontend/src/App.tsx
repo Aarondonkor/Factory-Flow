@@ -2,9 +2,13 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { CustomerLayout } from '@/components/layout/CustomerLayout'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { RoleRoute } from '@/routes/RoleRoute'
+import { RoleGate } from '@/routes/RoleGate'
 import { LoginPage } from '@/pages/LoginPage'
+import { CustomerSignupPage } from '@/pages/customer/CustomerSignupPage'
+import { CustomerPortalPage } from '@/pages/customer/CustomerPortalPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { ProductionPage } from '@/pages/production/ProductionPage'
 import { InventoryPage } from '@/pages/inventory/InventoryPage'
@@ -23,10 +27,14 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/customer/signup" element={<CustomerSignupPage />} />
+
         <Route
           element={
             <ProtectedRoute>
-              <AppLayout />
+              <RoleGate allow={(role) => role !== 'customer'} redirectTo="/customer">
+                <AppLayout />
+              </RoleGate>
             </ProtectedRoute>
           }
         >
@@ -72,6 +80,20 @@ export default function App() {
             }
           />
         </Route>
+
+        <Route
+          path="/customer"
+          element={
+            <ProtectedRoute>
+              <RoleGate allow={(role) => role === 'customer'} redirectTo="/">
+                <CustomerLayout />
+              </RoleGate>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<CustomerPortalPage />} />
+        </Route>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

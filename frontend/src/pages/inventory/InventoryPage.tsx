@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
-import type { RawMaterial, FinishedGood, StockMovement } from '@/types/database'
-import { formatDate, formatNumber } from '@/lib/format'
+import type { RawMaterial, FinishedGood, StockMovement, Customer } from '@/types/database'
+import { formatDate, formatNumber, formatCurrency } from '@/lib/format'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge, getStockBadge } from '@/components/ui/Badge'
@@ -20,6 +20,7 @@ export function InventoryPage() {
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
   const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
   const [movements, setMovements] = useState<StockMovement[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [adjustModal, setAdjustModal] = useState<{ type: 'raw' | 'finished'; id: string; name: string } | null>(null)
   const [formModal, setFormModal] = useState<'raw' | 'finished' | null>(null)
@@ -29,10 +30,11 @@ export function InventoryPage() {
 
   const fetchData = async () => {
     setLoading(true)
-    const [rawRes, finRes, movRes] = await Promise.all([
+    const [rawRes, finRes, movRes, custRes] = await Promise.all([
       supabase.from('raw_materials').select('*').order('name'),
       supabase.from('finished_goods').select('*').order('product_name'),
       supabase.from('stock_movements').select('*').order('created_at', { ascending: false }).limit(100),
+      supabase.from('customers').select('*').order('name'),
     ])
 
     if (rawRes.error) addToast(rawRes.error.message, 'error')
@@ -43,6 +45,8 @@ export function InventoryPage() {
 
     if (movRes.error) addToast(movRes.error.message, 'error')
     else setMovements(movRes.data || [])
+
+    if (!custRes.error) setCustomers(custRes.data || [])
 
     setLoading(false)
   }
@@ -145,37 +149,57 @@ export function InventoryPage() {
       {tab === 'finished' && (
         <Card title="Finished Goods">
           <ResponsiveTable
-            headers={['Product', 'Spec', 'Stock', 'Location', 'Actions']}
+            headers={['Product', 'Stage', 'Spec', 'Stock', 'List Price', 'Exclusive To', 'Actions']}
             isEmpty={finishedGoods.length === 0}
           >
-            {finishedGoods.map((g) => (
-              <TableRow
-                key={g.id}
-                cells={[
-                  g.product_name,
-                  `${g.spec_thickness || '—'}µ × ${g.spec_width || '—'}mm ${g.color || ''}`,
-                  `${formatNumber(g.current_stock)} ${g.unit}`,
-                  g.warehouse_location || '—',
-                  isAdmin ? (
-                    <Button
-                      variant="secondary"
-                      onClick={() => setAdjustModal({ type: 'finished', id: g.id, name: g.product_name })}
-                    >
-                      Adjust
-                    </Button>
-                  ) : null,
-                ]}
-                mobileCard={
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="font-medium">{g.product_name}</span>
-                      <span>{formatNumber(g.current_stock)} {g.unit}</span>
+            {finishedGoods.map((g) => {
+              const owner = g.customer_id ? customers.find((c) => c.id === g.customer_id) : null
+              return (
+                <TableRow
+                  key={g.id}
+                  cells={[
+                    g.product_name,
+                    <Badge variant={g.stage === 'semi_finished' ? 'warning' : 'success'}>
+                      {g.stage === 'semi_finished' ? 'Semi-Finished' : 'Finished'}
+                    </Badge>,
+                    `${g.spec_thickness || '—'}µ × ${g.spec_width || '—'}mm ${g.color || ''}`,
+                    `${formatNumber(g.current_stock)} ${g.unit === 'bundle' && g.bundle_size ? `bundle (${g.bundle_size}pc)` : g.unit}`,
+                    g.unit_price != null ? formatCurrency(g.unit_price) : '—',
+                    owner ? (
+                      <Badge variant="info">{owner.business_name || owner.name}</Badge>
+                    ) : (
+                      <span className="text-slate-400 text-xs">All customers</span>
+                    ),
+                    isAdmin ? (
+                      <Button
+                        variant="secondary"
+                        onClick={() => setAdjustModal({ type: 'finished', id: g.id, name: g.product_name })}
+                      >
+                        Adjust
+                      </Button>
+                    ) : null,
+                  ]}
+                  mobileCard={
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="font-medium">{g.product_name}</span>
+                        <span>{formatNumber(g.current_stock)} {g.unit}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge variant={g.stage === 'semi_finished' ? 'warning' : 'success'}>
+                          {g.stage === 'semi_finished' ? 'Semi-Finished' : 'Finished'}
+                        </Badge>
+                        {owner && <Badge variant="info">{owner.business_name || owner.name}</Badge>}
+                      </div>
+                      <p className="text-xs text-slate-500">{g.warehouse_location}</p>
+                      {g.unit_price != null && (
+                        <p className="text-xs font-semibold text-slate-700">{formatCurrency(g.unit_price)} / {g.unit}</p>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-500">{g.warehouse_location}</p>
-                  </div>
-                }
-              />
-            ))}
+                  }
+                />
+              )
+            })}
           </ResponsiveTable>
         </Card>
       )}
@@ -241,6 +265,7 @@ export function InventoryPage() {
       {formModal && (
         <MaterialFormModal
           type={formModal}
+          customers={customers}
           onClose={() => setFormModal(null)}
           onSuccess={() => {
             setFormModal(null)

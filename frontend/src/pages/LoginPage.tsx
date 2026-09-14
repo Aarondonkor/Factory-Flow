@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
 import { BRAND } from '@/lib/brand'
@@ -129,6 +129,12 @@ export function LoginPage() {
               >
                 {isSignUp ? 'Sign In' : 'Sign Up'}
               </button>
+            </p>
+            <p className="mt-3 text-center text-sm text-slate-500">
+              Ordering as a customer?{' '}
+              <Link to="/customer/signup" className="font-semibold text-brand-700 hover:text-brand-800 hover:underline">
+                Create a company account
+              </Link>
             </p>
           </div>
         </div>

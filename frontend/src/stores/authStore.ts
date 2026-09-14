@@ -14,6 +14,14 @@ interface AuthState {
   initialize: () => Promise<void>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>
+  signUpCustomer: (params: {
+    email: string
+    password: string
+    contactName: string
+    businessName: string
+    contactPhone: string
+    address: string
+  }) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   hasRole: (...roles: UserRole[]) => boolean
   canAccessModule: (module: 'dashboard' | 'production' | 'inventory' | 'sales' | 'hr' | 'settings') => boolean
@@ -71,6 +79,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       email,
       password,
       options: { data: { full_name: fullName } },
+    })
+    return { error: error?.message ?? null }
+  },
+
+  signUpCustomer: async ({ email, password, contactName, businessName, contactPhone, address }) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: contactName,
+          role: 'customer',
+          business_name: businessName,
+          contact_phone: contactPhone,
+          address,
+        },
+      },
     })
     return { error: error?.message ?? null }
   },
