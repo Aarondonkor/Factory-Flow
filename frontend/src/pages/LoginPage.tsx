@@ -6,6 +6,7 @@ import { BRAND } from '@/lib/brand'
 import { Logo } from '@/components/brand/Logo'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { ToastContainer } from '@/components/ui/Toast'
 
 export function LoginPage() {
   const [email, setEmail] = useState('')
@@ -139,6 +140,7 @@ export function LoginPage() {
           </div>
         </div>
       </div>
+      <ToastContainer />
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { BRAND } from '@/lib/brand'
 import { Logo } from '@/components/brand/Logo'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { ToastContainer } from '@/components/ui/Toast'
 
 export function CustomerSignupPage() {
   const [contactName, setContactName] = useState('')
@@ -26,21 +27,25 @@ export function CustomerSignupPage() {
     e.preventDefault()
     setLoading(true)
 
-    const { error } = await signUpCustomer({
-      email,
-      password,
-      contactName,
-      businessName,
-      contactPhone,
-      address,
-    })
+    try {
+      const { error } = await signUpCustomer({
+        email,
+        password,
+        contactName,
+        businessName,
+        contactPhone,
+        address,
+      })
 
-    setLoading(false)
-
-    if (error) {
-      addToast(error, 'error')
-    } else {
-      setSubmitted(true)
+      if (error) {
+        addToast(error, 'error')
+      } else {
+        setSubmitted(true)
+      }
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Something went wrong. Please try again.', 'error')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -164,6 +169,7 @@ export function CustomerSignupPage() {
           </div>
         </div>
       </div>
+      <ToastContainer />
     </div>
   )
 }
