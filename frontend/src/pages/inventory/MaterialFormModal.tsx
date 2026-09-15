@@ -39,6 +39,7 @@ export function MaterialFormModal({ type, customers = [], onClose, onSuccess }: 
     customer_id: '',
     unit_price: '',
     bundle_size: '',
+    customer_orderable: true,
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,6 +70,7 @@ export function MaterialFormModal({ type, customers = [], onClose, onSuccess }: 
         customer_id: finForm.customer_id || null,
         unit_price: finForm.unit_price ? parseFloat(finForm.unit_price) : null,
         bundle_size: finForm.unit === 'bundle' && finForm.bundle_size ? parseInt(finForm.bundle_size, 10) : null,
+        customer_orderable: finForm.customer_orderable,
       })
       if (error) addToast(error.message, 'error')
       else onSuccess()
@@ -147,6 +149,13 @@ export function MaterialFormModal({ type, customers = [], onClose, onSuccess }: 
                 onChange={(e) => setFinForm({ ...finForm, color: e.target.value })}
               />
             </div>
+            {finForm.unit === 'rolls' && (
+              <p className="text-xs text-slate-500 -mt-2">
+                For roll products, leave Thickness blank if the customer specifies their own micron
+                on each order (typical for branded rolls) — the requested micron is captured per
+                order, not fixed on the product.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <Select
                 label="Unit"
@@ -205,6 +214,14 @@ export function MaterialFormModal({ type, customers = [], onClose, onSuccess }: 
                   <option key={c.id} value={c.id}>{c.business_name || c.name} (branded product)</option>
                 ))}
               </Select>
+              <label className="mt-4 flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={finForm.customer_orderable}
+                  onChange={(e) => setFinForm({ ...finForm, customer_orderable: e.target.checked })}
+                />
+                Visible in customer portal (uncheck to keep internal-only)
+              </label>
             </div>
           </>
         )}

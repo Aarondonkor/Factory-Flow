@@ -3,21 +3,23 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
 import type { Customer, FinishedGood, Order } from '@/types/database'
-import { formatCurrency, formatDate, toInputDate, ORDER_STATUS_LABELS } from '@/lib/format'
+import { formatCurrency, formatDate, toInputDate, ORDER_STATUS_LABELS, DELIVERY_STATUS_LABELS } from '@/lib/format'
 import { Card, StatCard } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { Badge, getOrderStatusBadge } from '@/components/ui/Badge'
+import { Badge, getOrderStatusBadge, getDeliveryStatusBadge } from '@/components/ui/Badge'
 import { ResponsiveTable, TableRow } from '@/components/ui/Table'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { PageTabs } from '@/components/ui/PageTabs'
+import { OrderDetailModal } from '@/components/orders/OrderDetailModal'
 
 type Tab = 'place-order' | 'my-orders'
 
 interface CartLine {
   finished_good_id: string
   quantity: string
+  micron: string
 }
 
 function unitLabel(g: FinishedGood) {
@@ -38,7 +40,8 @@ export function CustomerPortalPage() {
 
   const [deliveryDate, setDeliveryDate] = useState(toInputDate(new Date(Date.now() + 7 * 86400000)))
   const [notes, setNotes] = useState('')
-  const [cart, setCart] = useState<CartLine[]>([{ finished_good_id: '', quantity: '' }])
+  const [cart, setCart] = useState<CartLine[]>([{ finished_good_id: '', quantity: '', micron: '' }])
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
   const orderableProducts = products.filter((p) => p.unit_price != null)
 
@@ -85,6 +88,15 @@ export function CustomerPortalPage() {
       return
     }
 
+    const missingMicron = validLines.find((l) => {
+      const product = products.find((p) => p.id === l.finished_good_id)
+      return product?.unit === 'rolls' && !(parseFloat(l.micron) > 0)
+    })
+    if (missingMicron) {
+      addToast('Please specify the micron (thickness) for each roll product', 'error')
+      return
+    }
+
     setSubmitting(true)
 
     const { data: order, error: orderError } = await supabase
@@ -106,11 +118,15 @@ export function CustomerPortalPage() {
     }
 
     const { error: itemsError } = await supabase.from('order_items').insert(
-      validLines.map((l) => ({
-        order_id: order.id,
-        finished_good_id: l.finished_good_id,
-        quantity: parseFloat(l.quantity),
-      }))
+      validLines.map((l) => {
+        const product = products.find((p) => p.id === l.finished_good_id)
+        return {
+          order_id: order.id,
+          finished_good_id: l.finished_good_id,
+          quantity: parseFloat(l.quantity),
+          specified_micron: product?.unit === 'rolls' ? parseFloat(l.micron) : null,
+        }
+      })
     )
 
     setSubmitting(false)
@@ -121,7 +137,7 @@ export function CustomerPortalPage() {
     }
 
     addToast('Order placed — awaiting confirmation')
-    setCart([{ finished_good_id: '', quantity: '' }])
+    setCart([{ finished_good_id: '', quantity: '', micron: '' }])
     setNotes('')
     setTab('my-orders')
     fetchData()
@@ -178,8 +194,9 @@ export function CustomerPortalPage() {
               <div className="space-y-3">
                 {cart.map((line, i) => {
                   const product = products.find((p) => p.id === line.finished_good_id)
+                  const isRoll = product?.unit === 'rolls'
                   return (
-                    <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
+                    <div key={i} className="rounded-xl border border-slate-200 p-3 space-y-2">
                       <Select
                         label={i === 0 ? 'Product' : undefined}
                         value={line.finished_good_id}
@@ -194,22 +211,34 @@ export function CustomerPortalPage() {
                           </option>
                         ))}
                       </Select>
-                      <Input
-                        label={i === 0 ? `Quantity${product ? ` (${unitLabel(product)})` : ''}` : undefined}
-                        type="number"
-                        step="0.01"
-                        className="w-32"
-                        value={line.quantity}
-                        onChange={(e) => updateCartLine(i, { quantity: e.target.value })}
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => setCart(cart.filter((_, idx) => idx !== i))}
-                        disabled={cart.length === 1}
-                      >
-                        ✕
-                      </Button>
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                        <Input
+                          label={`Quantity${product ? ` (${unitLabel(product)})` : ''}`}
+                          type="number"
+                          step="0.01"
+                          value={line.quantity}
+                          onChange={(e) => updateCartLine(i, { quantity: e.target.value })}
+                        />
+                        {isRoll && (
+                          <Input
+                            label="Micron (thickness)"
+                            type="number"
+                            step="0.01"
+                            value={line.micron}
+                            onChange={(e) => updateCartLine(i, { micron: e.target.value })}
+                            placeholder="e.g. 35"
+                            required
+                          />
+                        )}
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => setCart(cart.filter((_, idx) => idx !== i))}
+                          disabled={cart.length === 1}
+                        >
+                          ✕
+                        </Button>
+                      </div>
                     </div>
                   )
                 })}
@@ -217,7 +246,7 @@ export function CustomerPortalPage() {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => setCart([...cart, { finished_good_id: '', quantity: '' }])}
+                onClick={() => setCart([...cart, { finished_good_id: '', quantity: '', micron: '' }])}
               >
                 + Add Another Product
               </Button>
@@ -246,7 +275,7 @@ export function CustomerPortalPage() {
       {tab === 'my-orders' && (
         <Card title="My Orders">
           <ResponsiveTable
-            headers={['Order #', 'Date', 'Items', 'Total', 'Status']}
+            headers={['Order #', 'Date', 'Items', 'Total', 'Balance', 'Status', 'Delivery', '']}
             isEmpty={orders.length === 0}
             emptyMessage="You haven't placed any orders yet"
           >
@@ -257,10 +286,20 @@ export function CustomerPortalPage() {
                   o.order_number,
                   formatDate(o.created_at),
                   (o.order_items || [])
-                    .map((it) => `${it.quantity} × ${it.finished_goods?.product_name || 'item'}`)
+                    .map(
+                      (it) =>
+                        `${it.quantity} × ${it.finished_goods?.product_name || 'item'}${
+                          it.specified_micron ? ` (${it.specified_micron}µ)` : ''
+                        }`
+                    )
                     .join(', ') || '—',
                   formatCurrency(o.total),
+                  formatCurrency(o.balance_due),
                   <Badge variant={getOrderStatusBadge(o.status)}>{ORDER_STATUS_LABELS[o.status]}</Badge>,
+                  <Badge variant={getDeliveryStatusBadge(o.delivery_status)}>
+                    {DELIVERY_STATUS_LABELS[o.delivery_status]}
+                  </Badge>,
+                  <Button variant="secondary" onClick={() => setSelectedOrder(o)}>View</Button>,
                 ]}
                 mobileCard={
                   <div className="space-y-2 text-sm">
@@ -270,19 +309,42 @@ export function CustomerPortalPage() {
                     </div>
                     <p className="text-xs text-slate-500">
                       {(o.order_items || [])
-                        .map((it) => `${it.quantity} × ${it.finished_goods?.product_name || 'item'}`)
+                        .map(
+                          (it) =>
+                            `${it.quantity} × ${it.finished_goods?.product_name || 'item'}${
+                              it.specified_micron ? ` (${it.specified_micron}µ)` : ''
+                            }`
+                        )
                         .join(', ')}
                     </p>
-                    <div className="flex justify-between text-xs">
+                    <div className="flex items-center justify-between text-xs">
                       <span>{formatDate(o.created_at)}</span>
+                      <Badge variant={getDeliveryStatusBadge(o.delivery_status)}>
+                        {DELIVERY_STATUS_LABELS[o.delivery_status]}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span>Balance: {formatCurrency(o.balance_due)}</span>
                       <span className="font-semibold">{formatCurrency(o.total)}</span>
                     </div>
+                    <Button variant="secondary" className="w-full" onClick={() => setSelectedOrder(o)}>
+                      View Order
+                    </Button>
                   </div>
                 }
               />
             ))}
           </ResponsiveTable>
         </Card>
+      )}
+
+      {selectedOrder && (
+        <OrderDetailModal
+          order={selectedOrder}
+          canPay
+          onClose={() => setSelectedOrder(null)}
+          onPaid={fetchData}
+        />
       )}
     </div>
   )

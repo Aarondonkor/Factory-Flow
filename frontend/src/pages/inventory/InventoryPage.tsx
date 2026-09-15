@@ -55,6 +55,15 @@ export function InventoryPage() {
     fetchData()
   }, [])
 
+  const toggleOrderable = async (id: string, next: boolean) => {
+    const { error } = await supabase.from('finished_goods').update({ customer_orderable: next }).eq('id', id)
+    if (error) addToast(error.message, 'error')
+    else {
+      addToast(next ? 'Product visible to customers' : 'Product hidden from customer portal')
+      fetchData()
+    }
+  }
+
   const lowStockCount = rawMaterials.filter(
     (m) => m.reorder_threshold > 0 && m.current_stock <= m.reorder_threshold
   ).length
@@ -149,7 +158,7 @@ export function InventoryPage() {
       {tab === 'finished' && (
         <Card title="Finished Goods">
           <ResponsiveTable
-            headers={['Product', 'Stage', 'Spec', 'Stock', 'List Price', 'Exclusive To', 'Actions']}
+            headers={['Product', 'Stage', 'Spec', 'Stock', 'List Price', 'Exclusive To', 'Portal', 'Actions']}
             isEmpty={finishedGoods.length === 0}
           >
             {finishedGoods.map((g) => {
@@ -170,13 +179,21 @@ export function InventoryPage() {
                     ) : (
                       <span className="text-slate-400 text-xs">All customers</span>
                     ),
+                    <Badge variant={g.customer_orderable ? 'success' : 'default'}>
+                      {g.customer_orderable ? 'Visible' : 'Hidden'}
+                    </Badge>,
                     isAdmin ? (
-                      <Button
-                        variant="secondary"
-                        onClick={() => setAdjustModal({ type: 'finished', id: g.id, name: g.product_name })}
-                      >
-                        Adjust
-                      </Button>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          variant="secondary"
+                          onClick={() => setAdjustModal({ type: 'finished', id: g.id, name: g.product_name })}
+                        >
+                          Adjust
+                        </Button>
+                        <Button variant="secondary" onClick={() => toggleOrderable(g.id, !g.customer_orderable)}>
+                          {g.customer_orderable ? 'Hide from Portal' : 'Show in Portal'}
+                        </Button>
+                      </div>
                     ) : null,
                   ]}
                   mobileCard={
@@ -185,15 +202,27 @@ export function InventoryPage() {
                         <span className="font-medium">{g.product_name}</span>
                         <span>{formatNumber(g.current_stock)} {g.unit}</span>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Badge variant={g.stage === 'semi_finished' ? 'warning' : 'success'}>
                           {g.stage === 'semi_finished' ? 'Semi-Finished' : 'Finished'}
                         </Badge>
                         {owner && <Badge variant="info">{owner.business_name || owner.name}</Badge>}
+                        <Badge variant={g.customer_orderable ? 'success' : 'default'}>
+                          {g.customer_orderable ? 'Portal: Visible' : 'Portal: Hidden'}
+                        </Badge>
                       </div>
                       <p className="text-xs text-slate-500">{g.warehouse_location}</p>
                       {g.unit_price != null && (
                         <p className="text-xs font-semibold text-slate-700">{formatCurrency(g.unit_price)} / {g.unit}</p>
+                      )}
+                      {isAdmin && (
+                        <Button
+                          variant="secondary"
+                          className="w-full"
+                          onClick={() => toggleOrderable(g.id, !g.customer_orderable)}
+                        >
+                          {g.customer_orderable ? 'Hide from Portal' : 'Show in Portal'}
+                        </Button>
                       )}
                     </div>
                   }

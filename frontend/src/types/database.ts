@@ -42,6 +42,7 @@ export interface FinishedGood {
   warehouse_location: string | null
   stage: ProductStage
   customer_id: string | null
+  customer_orderable: boolean
   unit_price: number | null
   bundle_size: number | null
   created_at: string
@@ -211,6 +212,7 @@ export interface OrderItem {
   quantity: number
   unit_price: number
   line_total: number
+  specified_micron: number | null
   finished_goods?: FinishedGood
 }
 

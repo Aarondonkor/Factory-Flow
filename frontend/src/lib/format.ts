@@ -60,6 +60,12 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
+export const DELIVERY_STATUS_LABELS: Record<string, string> = {
+  pending: 'Not Dispatched',
+  dispatched: 'Dispatched',
+  delivered: 'Delivered',
+}
+
 export const SHIFT_LABELS: Record<string, string> = {
   morning: 'Morning',
   afternoon: 'Afternoon',

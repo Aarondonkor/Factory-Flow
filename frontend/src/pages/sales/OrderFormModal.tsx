@@ -28,7 +28,11 @@ export function OrderFormModal({ customers, finishedGoods, onClose, onSuccess }:
     finished_good_id: finishedGoods[0]?.id || '',
     quantity: '',
     unit_price: '',
+    micron: '',
   })
+
+  const selectedProduct = finishedGoods.find((g) => g.id === form.finished_good_id)
+  const isRoll = selectedProduct?.unit === 'rolls'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,6 +41,11 @@ export function OrderFormModal({ customers, finishedGoods, onClose, onSuccess }:
 
     if (!qty || !price) {
       addToast('Enter valid quantity and price', 'error')
+      return
+    }
+
+    if (isRoll && !(parseFloat(form.micron) > 0)) {
+      addToast('Please specify the micron (thickness) for this roll product', 'error')
       return
     }
 
@@ -64,6 +73,7 @@ export function OrderFormModal({ customers, finishedGoods, onClose, onSuccess }:
       finished_good_id: form.finished_good_id,
       quantity: qty,
       unit_price: price,
+      specified_micron: isRoll ? parseFloat(form.micron) : null,
     })
 
     setLoading(false)
@@ -98,7 +108,7 @@ export function OrderFormModal({ customers, finishedGoods, onClose, onSuccess }:
           <Select
             label="Product"
             value={form.finished_good_id}
-            onChange={(e) => setForm({ ...form, finished_good_id: e.target.value })}
+            onChange={(e) => setForm({ ...form, finished_good_id: e.target.value, micron: '' })}
             required
           >
             {finishedGoods.map((g) => (
@@ -125,6 +135,18 @@ export function OrderFormModal({ customers, finishedGoods, onClose, onSuccess }:
               required
             />
           </div>
+          {isRoll && (
+            <Input
+              label="Micron (thickness)"
+              type="number"
+              step="0.01"
+              className="mt-4"
+              value={form.micron}
+              onChange={(e) => setForm({ ...form, micron: e.target.value })}
+              placeholder="e.g. 35"
+              required
+            />
+          )}
         </div>
 
         <Input label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />

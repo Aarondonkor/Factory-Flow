@@ -3,16 +3,17 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
 import type { Customer, Order, Payment, FinishedGood } from '@/types/database'
-import { formatCurrency, formatDate, ORDER_STATUS_LABELS } from '@/lib/format'
+import { formatCurrency, formatDate, ORDER_STATUS_LABELS, DELIVERY_STATUS_LABELS } from '@/lib/format'
 import { Card, StatCard } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Badge, getOrderStatusBadge } from '@/components/ui/Badge'
+import { Badge, getOrderStatusBadge, getDeliveryStatusBadge } from '@/components/ui/Badge'
 import { ResponsiveTable, TableRow } from '@/components/ui/Table'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { PageTabs } from '@/components/ui/PageTabs'
 import { CustomerFormModal } from './CustomerFormModal'
 import { OrderFormModal } from './OrderFormModal'
 import { PaymentModal } from './PaymentModal'
+import { OrderDetailModal } from '@/components/orders/OrderDetailModal'
 
 type Tab = 'orders' | 'customers' | 'payments'
 
@@ -26,6 +27,7 @@ export function SalesPage() {
   const [showCustomerForm, setShowCustomerForm] = useState(false)
   const [showOrderForm, setShowOrderForm] = useState(false)
   const [paymentOrder, setPaymentOrder] = useState<Order | null>(null)
+  const [detailOrder, setDetailOrder] = useState<Order | null>(null)
 
   const canWrite = useAuthStore((s) => s.hasRole('admin', 'sales_staff'))
   const addToast = useToastStore((s) => s.addToast)
@@ -71,6 +73,20 @@ export function SalesPage() {
       addToast(error.message, 'error')
     } else {
       addToast(`Order ${status === 'confirmed' ? 'confirmed — stock deducted' : 'updated'}`)
+      fetchData()
+    }
+  }
+
+  const updateDeliveryStatus = async (orderId: string, delivery_status: 'dispatched' | 'delivered') => {
+    const { error } = await supabase
+      .from('orders')
+      .update({ delivery_status })
+      .eq('id', orderId)
+
+    if (error) {
+      addToast(error.message, 'error')
+    } else {
+      addToast(`Order marked as ${delivery_status}`)
       fetchData()
     }
   }
@@ -126,7 +142,7 @@ export function SalesPage() {
       {tab === 'orders' && (
         <Card title="Orders">
           <ResponsiveTable
-            headers={['Order #', 'Customer', 'Total', 'Paid', 'Balance', 'Status', 'Actions']}
+            headers={['Order #', 'Customer', 'Total', 'Paid', 'Balance', 'Status', 'Delivery', 'Actions']}
             isEmpty={orders.length === 0}
           >
             {orders.map((o) => (
@@ -141,20 +157,34 @@ export function SalesPage() {
                   <Badge variant={getOrderStatusBadge(o.status)}>
                     {ORDER_STATUS_LABELS[o.status]}
                   </Badge>,
-                  canWrite ? (
-                    <div className="flex gap-2 flex-wrap">
-                      {o.status === 'pending' && (
-                        <Button variant="secondary" onClick={() => updateOrderStatus(o.id, 'confirmed')}>
-                          Confirm
-                        </Button>
-                      )}
-                      {o.balance_due > 0 && (
-                        <Button variant="secondary" onClick={() => setPaymentOrder(o)}>
-                          Pay
-                        </Button>
-                      )}
-                    </div>
-                  ) : null,
+                  <Badge variant={getDeliveryStatusBadge(o.delivery_status)}>
+                    {DELIVERY_STATUS_LABELS[o.delivery_status]}
+                  </Badge>,
+                  <div className="flex gap-2 flex-wrap">
+                    <Button variant="secondary" onClick={() => setDetailOrder(o)}>
+                      View
+                    </Button>
+                    {canWrite && o.status === 'pending' && (
+                      <Button variant="secondary" onClick={() => updateOrderStatus(o.id, 'confirmed')}>
+                        Confirm
+                      </Button>
+                    )}
+                    {canWrite && o.balance_due > 0 && (
+                      <Button variant="secondary" onClick={() => setPaymentOrder(o)}>
+                        Pay
+                      </Button>
+                    )}
+                    {canWrite && o.delivery_status === 'pending' && (
+                      <Button variant="secondary" onClick={() => updateDeliveryStatus(o.id, 'dispatched')}>
+                        Dispatch
+                      </Button>
+                    )}
+                    {canWrite && o.delivery_status === 'dispatched' && (
+                      <Button variant="secondary" onClick={() => updateDeliveryStatus(o.id, 'delivered')}>
+                        Mark Delivered
+                      </Button>
+                    )}
+                  </div>,
                 ]}
                 mobileCard={
                   <div className="space-y-2 text-sm">
@@ -165,10 +195,32 @@ export function SalesPage() {
                       </Badge>
                     </div>
                     <p>{(o.customers as Customer)?.name}</p>
-                    <div className="flex justify-between text-xs">
+                    <div className="flex items-center justify-between text-xs">
                       <span>Total: {formatCurrency(o.total)}</span>
+                      <Badge variant={getDeliveryStatusBadge(o.delivery_status)}>
+                        {DELIVERY_STATUS_LABELS[o.delivery_status]}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between text-xs">
                       <span>Due: {formatCurrency(o.balance_due)}</span>
                     </div>
+                    {canWrite && (
+                      <div className="flex gap-2 flex-wrap">
+                        {o.delivery_status === 'pending' && (
+                          <Button variant="secondary" onClick={() => updateDeliveryStatus(o.id, 'dispatched')}>
+                            Dispatch
+                          </Button>
+                        )}
+                        {o.delivery_status === 'dispatched' && (
+                          <Button variant="secondary" onClick={() => updateDeliveryStatus(o.id, 'delivered')}>
+                            Mark Delivered
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    <Button variant="secondary" className="w-full" onClick={() => setDetailOrder(o)}>
+                      View Order
+                    </Button>
                   </div>
                 }
               />
@@ -262,24 +314,27 @@ export function SalesPage() {
             headers={['Date', 'Order', 'Customer', 'Amount', 'Method']}
             isEmpty={payments.length === 0}
           >
-            {payments.map((p) => (
-              <TableRow
-                key={p.id}
-                cells={[
-                  formatDate(p.created_at),
-                  (p.orders as Order)?.order_number || '—',
-                  '—',
-                  formatCurrency(p.amount),
-                  p.payment_method.replace('_', ' '),
-                ]}
-                mobileCard={
-                  <div className="flex justify-between text-sm">
-                    <span>{formatDate(p.created_at)}</span>
-                    <span className="font-medium">{formatCurrency(p.amount)}</span>
-                  </div>
-                }
-              />
-            ))}
+            {payments.map((p) => {
+              const order = p.orders as (Order & { customers?: Customer }) | undefined
+              return (
+                <TableRow
+                  key={p.id}
+                  cells={[
+                    formatDate(p.created_at),
+                    order?.order_number || '—',
+                    order?.customers?.name || '—',
+                    formatCurrency(p.amount),
+                    p.payment_method.replace('_', ' '),
+                  ]}
+                  mobileCard={
+                    <div className="flex justify-between text-sm">
+                      <span>{formatDate(p.created_at)}</span>
+                      <span className="font-medium">{formatCurrency(p.amount)}</span>
+                    </div>
+                  }
+                />
+              )
+            })}
           </ResponsiveTable>
         </Card>
       )}
@@ -317,6 +372,13 @@ export function SalesPage() {
             fetchData()
             addToast('Payment recorded')
           }}
+        />
+      )}
+
+      {detailOrder && (
+        <OrderDetailModal
+          order={detailOrder}
+          onClose={() => setDetailOrder(null)}
         />
       )}
     </div>

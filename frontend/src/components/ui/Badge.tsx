@@ -37,3 +37,12 @@ export function getOrderStatusBadge(status: string) {
   }
   return map[status] || 'default'
 }
+
+export function getDeliveryStatusBadge(status: string) {
+  const map: Record<string, 'default' | 'success' | 'warning' | 'danger' | 'info'> = {
+    pending: 'default',
+    dispatched: 'info',
+    delivered: 'success',
+  }
+  return map[status] || 'default'
+}
