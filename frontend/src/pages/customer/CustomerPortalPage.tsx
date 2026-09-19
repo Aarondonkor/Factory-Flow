@@ -46,8 +46,8 @@ export function CustomerPortalPage() {
 
   const orderableProducts = products.filter((p) => p.unit_price != null)
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true)
     const [companyRes, productsRes, ordersRes] = await Promise.all([
       supabase.from('customers').select('*').maybeSingle(),
       supabase.from('finished_goods').select('*').order('product_name'),
@@ -60,14 +60,14 @@ export function CustomerPortalPage() {
     setCompany(companyRes.data || null)
     setProducts(productsRes.data || [])
     setOrders(ordersRes.data || [])
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
 
   useEffect(() => {
     fetchData()
   }, [])
 
-  useAutoRefresh(fetchData, 20000)
+  useAutoRefresh(() => fetchData(true), 20000)
 
   const isApproved = company?.approval_status === 'approved'
 

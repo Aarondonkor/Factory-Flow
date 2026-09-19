@@ -33,8 +33,8 @@ export function SalesPage() {
   const canWrite = useAuthStore((s) => s.hasRole('admin', 'sales_staff'))
   const addToast = useToastStore((s) => s.addToast)
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true)
     const [custRes, ordRes, payRes, finRes] = await Promise.all([
       supabase.from('customers').select('*').order('name'),
       supabase
@@ -53,14 +53,14 @@ export function SalesPage() {
     setOrders(ordRes.data || [])
     setPayments(payRes.data || [])
     setFinishedGoods(finRes.data || [])
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
 
   useEffect(() => {
     fetchData()
   }, [])
 
-  useAutoRefresh(fetchData, 20000)
+  useAutoRefresh(() => fetchData(true), 20000)
 
   const totalRevenue = orders.reduce((s, o) => s + o.amount_paid, 0)
   const outstanding = orders.reduce((s, o) => s + o.balance_due, 0)

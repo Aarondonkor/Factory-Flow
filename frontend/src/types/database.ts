@@ -70,6 +70,7 @@ export interface Machine {
   name: string
   is_active: boolean
   stage: MachineStage
+  created_at: string
 }
 
 export type ConversionProcessType = 'cutting' | 'printing'
@@ -176,6 +177,7 @@ export interface Customer {
   owner_profile_id: string | null
   approval_status: CustomerApprovalStatus
   created_at: string
+  updated_at: string
 }
 
 export type OrderStatus =
@@ -199,8 +201,10 @@ export interface Order {
   amount_paid: number
   balance_due: number
   notes: string | null
+  created_by: string | null
   confirmed_at: string | null
   created_at: string
+  updated_at: string
   customers?: Customer
   order_items?: OrderItem[]
 }
@@ -213,6 +217,7 @@ export interface OrderItem {
   unit_price: number
   line_total: number
   specified_micron: number | null
+  created_at: string
   finished_goods?: FinishedGood
 }
 
@@ -223,6 +228,7 @@ export interface Payment {
   payment_method: 'paystack' | 'cash' | 'mobile_money' | 'bank_transfer'
   paystack_reference: string | null
   notes: string | null
+  recorded_by: string | null
   created_at: string
   orders?: Order
 }
@@ -242,6 +248,8 @@ export interface Employee {
   next_of_kin_name: string | null
   next_of_kin_phone: string | null
   is_active: boolean
+  created_at: string
+  updated_at: string
 }
 
 export interface Attendance {

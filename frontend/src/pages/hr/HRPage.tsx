@@ -29,8 +29,8 @@ export function HRPage() {
   const canManage = useAuthStore((s) => s.hasRole('admin', 'hr_officer'))
   const addToast = useToastStore((s) => s.addToast)
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true)
 
     const [empRes, attRes, payRes] = await Promise.all([
       supabase.from('employees').select('*').order('full_name'),
@@ -49,14 +49,14 @@ export function HRPage() {
     setEmployees(empRes.data || [])
     setAttendance(attRes.data || [])
     setPayroll(payRes.data || [])
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
 
   useEffect(() => {
     fetchData()
   }, [])
 
-  useAutoRefresh(fetchData, 20000)
+  useAutoRefresh(() => fetchData(true), 20000)
 
   const activeEmployees = employees.filter((e) => e.is_active).length
   const today = new Date().toISOString().split('T')[0];

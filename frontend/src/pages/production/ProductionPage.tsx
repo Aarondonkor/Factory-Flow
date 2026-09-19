@@ -29,8 +29,8 @@ export function ProductionPage() {
   const canWrite = useAuthStore((s) => s.hasRole('admin', 'production_supervisor'))
   const addToast = useToastStore((s) => s.addToast)
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true)
     const [runsRes, dtRes, machRes, rawRes, finRes] = await Promise.all([
       supabase
         .from('production_runs')
@@ -49,23 +49,23 @@ export function ProductionPage() {
       supabase.from('finished_goods').select('*').order('product_name'),
     ])
 
-    if (runsRes.error) addToast(runsRes.error.message, 'error')
+    if (runsRes.error) { if (!silent) addToast(runsRes.error.message, 'error') }
     else setRuns(runsRes.data || [])
 
-    if (dtRes.error) addToast(dtRes.error.message, 'error')
+    if (dtRes.error) { if (!silent) addToast(dtRes.error.message, 'error') }
     else setDowntimes(dtRes.data || [])
 
     setMachines(machRes.data || [])
     setRawMaterials(rawRes.data || [])
     setFinishedGoods(finRes.data || [])
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
 
   useEffect(() => {
     fetchData()
   }, [])
 
-  useAutoRefresh(fetchData, 20000)
+  useAutoRefresh(() => fetchData(true), 20000)
 
   const totalOutput = runs.reduce((sum, r) => sum + r.output_quantity, 0)
   const totalWaste = runs.reduce((sum, r) => sum + r.waste_quantity, 0)

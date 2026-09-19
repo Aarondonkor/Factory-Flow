@@ -29,8 +29,8 @@ export function InventoryPage() {
   const isAdmin = useAuthStore((s) => s.hasRole('admin'))
   const addToast = useToastStore((s) => s.addToast)
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true)
     const [rawRes, finRes, movRes, custRes] = await Promise.all([
       supabase.from('raw_materials').select('*').order('name'),
       supabase.from('finished_goods').select('*').order('product_name'),
@@ -38,25 +38,25 @@ export function InventoryPage() {
       supabase.from('customers').select('*').order('name'),
     ])
 
-    if (rawRes.error) addToast(rawRes.error.message, 'error')
+    if (rawRes.error) { if (!silent) addToast(rawRes.error.message, 'error') }
     else setRawMaterials(rawRes.data || [])
 
-    if (finRes.error) addToast(finRes.error.message, 'error')
+    if (finRes.error) { if (!silent) addToast(finRes.error.message, 'error') }
     else setFinishedGoods(finRes.data || [])
 
-    if (movRes.error) addToast(movRes.error.message, 'error')
+    if (movRes.error) { if (!silent) addToast(movRes.error.message, 'error') }
     else setMovements(movRes.data || [])
 
     if (!custRes.error) setCustomers(custRes.data || [])
 
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
 
   useEffect(() => {
     fetchData()
   }, [])
 
-  useAutoRefresh(fetchData, 20000)
+  useAutoRefresh(() => fetchData(true), 20000)
 
   const toggleOrderable = async (id: string, next: boolean) => {
     const { error } = await supabase.from('finished_goods').update({ customer_orderable: next }).eq('id', id)
