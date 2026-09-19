@@ -37,11 +37,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         <div className="fixed inset-0 z-40 bg-brand-950/60 backdrop-blur-sm lg:hidden" onClick={onClose} />
       )}
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-[17.5rem] bg-gradient-to-b from-brand-950 via-brand-900 to-brand-950 text-white transform transition-transform duration-300 lg:translate-x-0 lg:static lg:z-auto ${
+        className={`fixed top-0 left-0 z-50 flex h-full w-[17.5rem] flex-col bg-gradient-to-b from-brand-950 via-brand-900 to-brand-950 text-white transform transition-transform duration-300 lg:translate-x-0 lg:static lg:z-auto ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="relative overflow-hidden px-5 py-6 border-b border-white/10">
+        <div className="relative shrink-0 overflow-hidden px-5 py-6 border-b border-white/10">
           <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-accent-500/10 blur-2xl" />
           <Logo variant="light" size="md" />
           <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.2em] text-brand-300/80">
@@ -49,7 +49,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </p>
         </div>
 
-        <nav className="p-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-brand-400/70">
             Operations
           </p>
@@ -84,7 +84,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {profile && (
-          <div className="absolute bottom-0 left-0 right-0 border-t border-white/10 bg-black/20 p-4 backdrop-blur-sm">
+          <div className="shrink-0 border-t border-white/10 bg-black/20 p-4 backdrop-blur-sm">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent-500 to-accent-600 text-sm font-bold text-brand-950">
                 {(profile.full_name || profile.email).charAt(0).toUpperCase()}
