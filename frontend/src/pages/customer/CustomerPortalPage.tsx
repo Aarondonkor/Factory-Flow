@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
 import type { Customer, FinishedGood, Order } from '@/types/database'
@@ -65,6 +66,8 @@ export function CustomerPortalPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  useAutoRefresh(fetchData, 20000)
 
   const isApproved = company?.approval_status === 'approved'
 
@@ -211,7 +214,7 @@ export function CustomerPortalPage() {
                           </option>
                         ))}
                       </Select>
-                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
                         <Input
                           label={`Quantity${product ? ` (${unitLabel(product)})` : ''}`}
                           type="number"

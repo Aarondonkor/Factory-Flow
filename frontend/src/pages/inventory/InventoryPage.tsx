@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
 import type { RawMaterial, FinishedGood, StockMovement, Customer } from '@/types/database'
@@ -54,6 +55,8 @@ export function InventoryPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  useAutoRefresh(fetchData, 20000)
 
   const toggleOrderable = async (id: string, next: boolean) => {
     const { error } = await supabase.from('finished_goods').update({ customer_orderable: next }).eq('id', id)

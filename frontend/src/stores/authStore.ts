@@ -13,7 +13,13 @@ interface AuthState {
   setLoading: (loading: boolean) => void
   initialize: () => Promise<void>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    roleTitle?: string,
+    contactPhone?: string
+  ) => Promise<{ error: string | null }>
   signUpCustomer: (params: {
     email: string
     password: string
@@ -74,11 +80,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return { error: error?.message ?? null }
   },
 
-  signUp: async (email, password, fullName) => {
+  signUp: async (email, password, fullName, roleTitle, contactPhone) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName, role_title: roleTitle, contact_phone: contactPhone } },
     })
     return { error: error?.message ?? null }
   },

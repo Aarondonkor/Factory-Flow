@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
 import type { Customer, Order, Payment, FinishedGood } from '@/types/database'
@@ -58,6 +59,8 @@ export function SalesPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  useAutoRefresh(fetchData, 20000)
 
   const totalRevenue = orders.reduce((s, o) => s + o.amount_paid, 0)
   const outstanding = orders.reduce((s, o) => s + o.balance_due, 0)

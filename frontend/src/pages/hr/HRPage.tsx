@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
 import type { Employee, Attendance, PayrollRecord } from '@/types/database'
@@ -54,6 +55,8 @@ export function HRPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  useAutoRefresh(fetchData, 20000)
 
   const activeEmployees = employees.filter((e) => e.is_active).length
   const today = new Date().toISOString().split('T')[0];

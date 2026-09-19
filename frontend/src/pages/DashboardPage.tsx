@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { Card, StatCard } from '@/components/ui/Card'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -39,8 +40,7 @@ export function DashboardPage() {
   const profile = useAuthStore((s) => s.profile)
   const canAccessModule = useAuthStore((s) => s.canAccessModule)
 
-  useEffect(() => {
-    async function fetchDashboard() {
+  const fetchDashboard = useCallback(async () => {
       const today = new Date().toISOString().split('T')[0]
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
 
@@ -123,10 +123,13 @@ export function DashboardPage() {
         lowStockItems,
       })
       setLoading(false)
-    }
-
-    fetchDashboard()
   }, [canAccessModule])
+
+  useEffect(() => {
+    fetchDashboard()
+  }, [fetchDashboard])
+
+  useAutoRefresh(fetchDashboard, 30000)
 
   if (loading) return <LoadingSpinner className="py-20" />
   if (!data) return null

@@ -130,7 +130,7 @@ export function MaterialFormModal({ type, customers = [], onClose, onSuccess }: 
               onChange={(e) => setFinForm({ ...finForm, product_name: e.target.value })}
               required
             />
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <Input
                 label="Thickness (µ)"
                 type="number"

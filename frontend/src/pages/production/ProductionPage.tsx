@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
 import type { ProductionRun, MachineDowntime, Machine, RawMaterial, FinishedGood } from '@/types/database'
@@ -63,6 +64,8 @@ export function ProductionPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  useAutoRefresh(fetchData, 20000)
 
   const totalOutput = runs.reduce((sum, r) => sum + r.output_quantity, 0)
   const totalWaste = runs.reduce((sum, r) => sum + r.waste_quantity, 0)

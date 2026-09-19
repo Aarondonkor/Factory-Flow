@@ -12,6 +12,8 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
+  const [jobTitle, setJobTitle] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -25,7 +27,7 @@ export function LoginPage() {
     setLoading(true)
 
     const result = isSignUp
-      ? await signUp(email, password, fullName)
+      ? await signUp(email, password, fullName, jobTitle, contactPhone)
       : await signIn(email, password)
 
     setLoading(false)
@@ -91,13 +93,28 @@ export function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {isSignUp && (
-                <Input
-                  label="Full Name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  placeholder="Your full name"
-                />
+                <>
+                  <Input
+                    label="Full Name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    placeholder="Your full name"
+                  />
+                  <Input
+                    label="Job Title"
+                    value={jobTitle}
+                    onChange={(e) => setJobTitle(e.target.value)}
+                    placeholder="e.g. Machine Operator, Accountant"
+                  />
+                  <Input
+                    label="Phone"
+                    type="tel"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="024 000 0000"
+                  />
+                </>
               )}
               <Input
                 label="Email"

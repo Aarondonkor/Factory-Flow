@@ -303,7 +303,7 @@ export function ProductionRunForm({
           ))}
         </Select>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <Input
             label="Thickness (µ)"
             type="number"
@@ -323,7 +323,7 @@ export function ProductionRunForm({
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <Input
             label="Output Quantity"
             type="number"
@@ -375,7 +375,7 @@ export function ProductionRunForm({
             </div>
 
             {isCutting && (
-              <div className="grid grid-cols-3 gap-4 mt-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
                 <Input
                   label="Cut Length (mm)"
                   type="number"
@@ -399,7 +399,7 @@ export function ProductionRunForm({
 
             {isPrinting && (
               <>
-                <div className="grid grid-cols-3 gap-4 mt-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
                   <Input
                     label="No. of Colours"
                     type="number"
@@ -419,7 +419,7 @@ export function ProductionRunForm({
                     onChange={(e) => setForm({ ...form, print_tension: e.target.value })}
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4 items-end">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4 items-end">
                   <label className="flex items-center gap-2 text-sm text-slate-700">
                     <input
                       type="checkbox"
@@ -459,7 +459,7 @@ export function ProductionRunForm({
               </span>
             </div>
             {materials.map((line, i) => (
-              <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-end mb-2">
+              <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2 items-end mb-2">
                 <Select
                   label={i === 0 ? 'Material' : undefined}
                   value={line.raw_material_id}
@@ -475,7 +475,7 @@ export function ProductionRunForm({
                   label={i === 0 ? 'Qty (kg)' : undefined}
                   type="number"
                   step="0.01"
-                  className="w-28"
+                  className="w-full sm:w-28"
                   value={line.quantity_kg}
                   onChange={(e) => updateMaterial(i, { quantity_kg: e.target.value })}
                 />
@@ -483,7 +483,7 @@ export function ProductionRunForm({
                   label={i === 0 ? 'Proportion %' : undefined}
                   type="number"
                   step="0.1"
-                  className="w-28"
+                  className="w-full sm:w-28"
                   value={line.proportion_pct}
                   onChange={(e) => updateMaterial(i, { proportion_pct: e.target.value })}
                 />
@@ -512,7 +512,7 @@ export function ProductionRunForm({
               onChange={(e) => setForm({ ...form, formula_code: e.target.value })}
             />
 
-            <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
               <Input
                 label="Number of Rolls"
                 type="number"
@@ -535,7 +535,7 @@ export function ProductionRunForm({
             </div>
 
             <p className="text-sm font-medium text-slate-700 mt-4 mb-3">Production Time</p>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <Input
                 label="Start Time"
                 type="time"
@@ -565,7 +565,7 @@ export function ProductionRunForm({
             </div>
 
             <p className="text-sm font-medium text-slate-700 mt-4 mb-3">Machine Parameters</p>
-            <div className="grid grid-cols-6 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {(['temp_z1', 'temp_z2', 'temp_z3', 'temp_z4', 'temp_z5', 'temp_z6'] as const).map((z, i) => (
                 <Input
                   key={z}
@@ -596,7 +596,7 @@ export function ProductionRunForm({
         <div className="border-t pt-4">
           <p className="text-sm font-medium text-slate-700 mb-3">Quality Control</p>
           {!isPrinting && (
-            <div className="grid grid-cols-3 gap-4 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-3">
               <Input
                 label="Samples Tested"
                 type="number"
