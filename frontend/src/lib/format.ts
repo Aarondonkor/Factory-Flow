@@ -71,3 +71,13 @@ export const SHIFT_LABELS: Record<string, string> = {
   afternoon: 'Afternoon',
   night: 'Night',
 }
+
+/** Short spec suffix for an order line, e.g. " (35µ)". Empty when no micron was recorded. */
+export function formatItemSpec(item: { specified_micron?: number | null }): string {
+  return item.specified_micron ? ` (${item.specified_micron}µ)` : ''
+}
+
+/** Weight formatting for kg figures: up to 2 decimals, thousands separated. */
+export function formatKg(kg: number): string {
+  return `${kg.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg`
+}

@@ -195,7 +195,7 @@ export function MaterialFormModal({ type, customers = [], onClose, onSuccess }: 
                   <option value="finished">Finished</option>
                 </Select>
                 <Input
-                  label="List Price (GHS, for online ordering)"
+                  label="List Price (GHS) — per kg for roll products"
                   type="number"
                   step="0.01"
                   value={finForm.unit_price}

@@ -3,8 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
-import type { RawMaterial, FinishedGood, StockMovement, Customer } from '@/types/database'
-import { formatDate, formatNumber, formatCurrency } from '@/lib/format'
+import type { RawMaterial, FinishedGood, StockMovement, Customer, ProductRoll } from '@/types/database'
+import { formatDate, formatNumber, formatCurrency, formatKg } from '@/lib/format'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge, getStockBadge } from '@/components/ui/Badge'
@@ -14,7 +14,7 @@ import { PageTabs } from '@/components/ui/PageTabs'
 import { StockAdjustModal } from './StockAdjustModal'
 import { MaterialFormModal } from './MaterialFormModal'
 
-type Tab = 'raw' | 'finished' | 'movements'
+type Tab = 'raw' | 'finished' | 'rolls' | 'movements'
 
 export function InventoryPage() {
   const [tab, setTab] = useState<Tab>('raw')
@@ -22,6 +22,7 @@ export function InventoryPage() {
   const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [rolls, setRolls] = useState<ProductRoll[]>([])
   const [loading, setLoading] = useState(true)
   const [adjustModal, setAdjustModal] = useState<{ type: 'raw' | 'finished'; id: string; name: string } | null>(null)
   const [formModal, setFormModal] = useState<'raw' | 'finished' | null>(null)
@@ -31,11 +32,12 @@ export function InventoryPage() {
 
   const fetchData = async (silent = false) => {
     if (!silent) setLoading(true)
-    const [rawRes, finRes, movRes, custRes] = await Promise.all([
+    const [rawRes, finRes, movRes, custRes, rollRes] = await Promise.all([
       supabase.from('raw_materials').select('*').order('name'),
       supabase.from('finished_goods').select('*').order('product_name'),
       supabase.from('stock_movements').select('*').order('created_at', { ascending: false }).limit(100),
       supabase.from('customers').select('*').order('name'),
+      supabase.from('product_rolls').select('*').order('roll_no', { ascending: false }).limit(500),
     ])
 
     if (rawRes.error) { if (!silent) addToast(rawRes.error.message, 'error') }
@@ -48,6 +50,7 @@ export function InventoryPage() {
     else setMovements(movRes.data || [])
 
     if (!custRes.error) setCustomers(custRes.data || [])
+    if (!rollRes.error) setRolls(rollRes.data || [])
 
     if (!silent) setLoading(false)
   }
@@ -74,6 +77,7 @@ export function InventoryPage() {
   const tabs = [
     { id: 'raw' as const, label: 'Raw Materials' },
     { id: 'finished' as const, label: 'Finished Goods' },
+    { id: 'rolls' as const, label: 'Individual Rolls' },
     { id: 'movements' as const, label: 'Stock History' },
   ]
 
@@ -95,7 +99,7 @@ export function InventoryPage() {
         active={tab}
         onChange={(id) => setTab(id as Tab)}
         action={
-          isAdmin && tab !== 'movements' ? (
+          isAdmin && (tab === 'raw' || tab === 'finished') ? (
             <Button
               variant="secondary"
               onClick={() => setFormModal(tab === 'raw' ? 'raw' : 'finished')}
@@ -227,6 +231,56 @@ export function InventoryPage() {
                           {g.customer_orderable ? 'Hide from Portal' : 'Show in Portal'}
                         </Button>
                       )}
+                    </div>
+                  }
+                />
+              )
+            })}
+          </ResponsiveTable>
+        </Card>
+      )}
+
+      {tab === 'rolls' && (
+        <Card title="Individual Rolls">
+          <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
+            {(['available', 'reserved', 'sold'] as const).map((st) => {
+              const list = rolls.filter((r) => r.status === st)
+              return (
+                <div key={st} className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-xs capitalize text-slate-500">{st}</p>
+                  <p className="font-semibold text-slate-900">{list.length} rolls</p>
+                  <p className="text-xs text-slate-500">{formatKg(list.reduce((s, r) => s + r.weight_kg, 0))}</p>
+                </div>
+              )
+            })}
+          </div>
+          <ResponsiveTable
+            headers={['Roll #', 'Product', 'Weight', 'Micron', 'Status', 'Logged']}
+            isEmpty={rolls.length === 0}
+            emptyMessage="No individual rolls yet. They appear when a printing run is logged with roll weights."
+          >
+            {rolls.map((r) => {
+              const product = finishedGoods.find((g) => g.id === r.finished_good_id)
+              return (
+                <TableRow
+                  key={r.id}
+                  cells={[
+                    `#${r.roll_no}`,
+                    product?.product_name || '—',
+                    formatKg(r.weight_kg),
+                    r.micron ? `${r.micron}µ` : '—',
+                    <Badge variant={r.status === 'available' ? 'success' : r.status === 'reserved' ? 'warning' : 'default'}>
+                      {r.status}
+                    </Badge>,
+                    formatDate(r.created_at),
+                  ]}
+                  mobileCard={
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="font-medium">#{r.roll_no} · {product?.product_name || '—'}</span>
+                        <span>{formatKg(r.weight_kg)}</span>
+                      </div>
+                      <p className="text-xs text-slate-500">{r.status}{r.micron ? ` · ${r.micron}µ` : ''}</p>
                     </div>
                   }
                 />

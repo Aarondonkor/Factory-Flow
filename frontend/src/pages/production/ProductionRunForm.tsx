@@ -97,6 +97,7 @@ export function ProductionRunForm({
     batch_id: '',
     quality_grade: '',
 
+    roll_weights_text: '',
     waste_quantity: '0',
     notes: '',
   })
@@ -108,6 +109,16 @@ export function ProductionRunForm({
   const outputOptions = isConversion ? finishedOnlyGoods : semiFinishedGoods
   const selectedInputProduct = semiFinishedGoods.find((g) => g.id === form.input_product_id)
   const qcIssueOptions = isPrinting ? PRINTING_QC_ISSUES : EXTRUSION_QC_ISSUES
+  // Printing runs that produce a roll product log the weight of every roll,
+  // e.g. "12.3, 14.6, 20, 11, 19.9". Each weight becomes one sellable roll.
+  const outputProduct = finishedGoods.find((g) => g.id === form.finished_good_id)
+  const rollMode = isPrinting && outputProduct?.unit === 'rolls'
+  const parsedWeights = form.roll_weights_text
+    .split(/[\s,;]+/)
+    .filter((t) => t.length > 0)
+    .map((t) => Number(t))
+  const weightsInvalid = parsedWeights.some((w) => !Number.isFinite(w) || w <= 0 || w > 500)
+  const weightsTotal = parsedWeights.reduce((sum, w) => sum + (Number.isFinite(w) ? w : 0), 0)
   const proportionTotal = materials.reduce((sum, m) => sum + (parseFloat(m.proportion_pct) || 0), 0)
 
   const handleMachineChange = (machineId: string) => {
@@ -137,6 +148,12 @@ export function ProductionRunForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (rollMode && (parsedWeights.length === 0 || weightsInvalid)) {
+      addToast('Enter the weight of each roll in kg, separated by commas (e.g. 12.3, 14.6, 20)', 'error')
+      return
+    }
+
     setLoading(true)
 
     const { data: run, error } = await supabase
@@ -151,8 +168,9 @@ export function ProductionRunForm({
         film_thickness: form.film_thickness ? parseFloat(form.film_thickness) : null,
         film_width: form.film_width ? parseFloat(form.film_width) : null,
         film_color: form.film_color || null,
-        output_quantity: parseFloat(form.output_quantity),
-        output_unit: form.output_unit,
+        output_quantity: rollMode ? parsedWeights.length : parseFloat(form.output_quantity),
+        output_unit: rollMode ? 'rolls' : form.output_unit,
+        roll_weights: rollMode ? parsedWeights : null,
         input_product_id: isConversion ? (form.input_product_id || null) : null,
         input_quantity_consumed: isConversion ? (parseFloat(form.input_quantity_consumed) || 0) : 0,
         process_type: isConversion ? form.process_type : null,
@@ -323,29 +341,57 @@ export function ProductionRunForm({
           />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <Input
-            label="Output Quantity"
-            type="number"
-            step="0.01"
-            value={form.output_quantity}
-            onChange={(e) => setForm({ ...form, output_quantity: e.target.value })}
-            required
-          />
-          <Select
-            label="Output Unit"
-            value={form.output_unit}
-            onChange={(e) => setForm({ ...form, output_unit: e.target.value as 'kg' | 'rolls' })}
-          >
-            <option value="kg">Kilograms</option>
-            <option value="rolls">Rolls</option>
-          </Select>
-          <Input
-            label="Batch ID"
-            value={form.batch_id}
-            onChange={(e) => setForm({ ...form, batch_id: e.target.value })}
-          />
-        </div>
+        {rollMode ? (
+          <div className="space-y-3">
+            <div>
+              <label className="label" htmlFor="roll-weights">Individual roll weights (kg)</label>
+              <textarea
+                id="roll-weights"
+                className="input min-h-[5rem]"
+                value={form.roll_weights_text}
+                onChange={(e) => setForm({ ...form, roll_weights_text: e.target.value })}
+                placeholder="12.3, 14.6, 20, 11, 19.9"
+                required
+              />
+              <p className={`mt-1 text-xs ${weightsInvalid ? 'text-red-600' : 'text-slate-500'}`}>
+                {weightsInvalid
+                  ? 'Every weight must be a number above 0 and at most 500.'
+                  : parsedWeights.length === 0
+                  ? `One weight per roll produced, separated by commas${outputProduct ? ` — logged against ${outputProduct.product_name}` : ''}.`
+                  : `${parsedWeights.length} roll${parsedWeights.length === 1 ? '' : 's'} · ${weightsTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg total`}
+              </p>
+            </div>
+            <Input
+              label="Batch ID"
+              value={form.batch_id}
+              onChange={(e) => setForm({ ...form, batch_id: e.target.value })}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <Input
+              label="Output Quantity"
+              type="number"
+              step="0.01"
+              value={form.output_quantity}
+              onChange={(e) => setForm({ ...form, output_quantity: e.target.value })}
+              required
+            />
+            <Select
+              label="Output Unit"
+              value={form.output_unit}
+              onChange={(e) => setForm({ ...form, output_unit: e.target.value as 'kg' | 'rolls' })}
+            >
+              <option value="kg">Kilograms</option>
+              <option value="rolls">Rolls</option>
+            </Select>
+            <Input
+              label="Batch ID"
+              value={form.batch_id}
+              onChange={(e) => setForm({ ...form, batch_id: e.target.value })}
+            />
+          </div>
+        )}
 
         {isConversion ? (
           <div className="border-t pt-4">

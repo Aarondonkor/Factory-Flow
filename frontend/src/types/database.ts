@@ -104,6 +104,7 @@ export interface ProductionRun {
   additive_consumed: number
   input_product_id: string | null
   input_quantity_consumed: number
+  roll_weights: number[] | null
   process_type: ConversionProcessType | null
 
   formula_code: string | null
@@ -298,4 +299,19 @@ export interface Notification {
   order_id: string | null
   is_read: boolean
   created_at: string
+}
+
+export type RollStatus = 'available' | 'reserved' | 'sold'
+
+export interface ProductRoll {
+  id: string
+  roll_no: number
+  finished_good_id: string
+  production_run_id: string | null
+  weight_kg: number
+  micron: number | null
+  status: RollStatus
+  order_item_id: string | null
+  created_at: string
+  finished_goods?: FinishedGood
 }
