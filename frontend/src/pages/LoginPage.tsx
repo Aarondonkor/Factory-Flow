@@ -15,9 +15,11 @@ export function LoginPage() {
   const [jobTitle, setJobTitle] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
+  const [isForgot, setIsForgot] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const { user, signIn, signUp } = useAuthStore()
+  const { user, signIn, signUp, resetPassword } = useAuthStore()
   const addToast = useToastStore((s) => s.addToast)
 
   if (user) return <Navigate to="/" replace />
@@ -25,6 +27,14 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    if (isForgot) {
+      const { error } = await resetPassword(email.trim())
+      setLoading(false)
+      if (error) addToast(error, 'error')
+      else setResetSent(true)
+      return
+    }
 
     const result = isSignUp
       ? await signUp(email, password, fullName, jobTitle, contactPhone)
@@ -82,14 +92,36 @@ export function LoginPage() {
           <div className="card p-8 shadow-elevated">
             <div className="mb-8">
               <h1 className="font-display text-2xl font-bold text-slate-900">
-                {isSignUp ? 'Create your account' : 'Welcome back'}
+                {isForgot ? 'Reset your password' : isSignUp ? 'Create your account' : 'Welcome back'}
               </h1>
               <p className="mt-1.5 text-sm text-slate-500">
-                {isSignUp
+                {isForgot
+                  ? "Enter your account email and we'll send you a link to choose a new password."
+                  : isSignUp
                   ? `Join the ${BRAND.shortName} operations portal`
                   : `Sign in to ${BRAND.appName}`}
               </p>
             </div>
+
+            {isForgot && resetSent ? (
+              <div className="space-y-5">
+                <div className="rounded-xl bg-brand-50 p-4 text-sm text-brand-900">
+                  If an account exists for <span className="font-semibold">{email}</span>, a reset link is on its way.
+                  Check your inbox (and spam folder). The link works for a limited time.
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => {
+                    setIsForgot(false)
+                    setResetSent(false)
+                  }}
+                >
+                  Back to sign in
+                </Button>
+              </div>
+            ) : (
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {isSignUp && (
@@ -124,36 +156,65 @@ export function LoginPage() {
                 required
                 placeholder="you@purifaventures.com"
               />
-              <Input
-                label="Password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                placeholder="••••••••"
-              />
+              {!isForgot && (
+                <div>
+                  <Input
+                    label="Password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    placeholder="••••••••"
+                  />
+                  {!isSignUp && (
+                    <div className="mt-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setIsForgot(true)}
+                        className="text-sm font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <Button type="submit" loading={loading} className="w-full !py-3">
-                {isSignUp ? 'Create Account' : 'Sign In'}
+                {isForgot ? 'Send reset link' : isSignUp ? 'Create Account' : 'Sign In'}
               </Button>
+              {isForgot && (
+                <button
+                  type="button"
+                  onClick={() => setIsForgot(false)}
+                  className="block w-full text-center text-sm font-semibold text-brand-700 hover:underline"
+                >
+                  Back to sign in
+                </button>
+              )}
             </form>
+            )}
 
-            <p className="mt-8 text-center text-sm text-slate-500">
-              {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
-              >
-                {isSignUp ? 'Sign In' : 'Sign Up'}
-              </button>
-            </p>
-            <p className="mt-3 text-center text-sm text-slate-500">
-              Ordering as a customer?{' '}
-              <Link to="/customer/signup" className="font-semibold text-brand-700 hover:text-brand-800 hover:underline">
-                Create a company account
-              </Link>
-            </p>
+            {!isForgot && (
+              <>
+              <p className="mt-8 text-center text-sm text-slate-500">
+                {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                >
+                  {isSignUp ? 'Sign In' : 'Sign Up'}
+                </button>
+              </p>
+              <p className="mt-3 text-center text-sm text-slate-500">
+                Ordering as a customer?{' '}
+                <Link to="/customer/signup" className="font-semibold text-brand-700 hover:text-brand-800 hover:underline">
+                  Create a company account
+                </Link>
+              </p>
+              </>
+            )}
           </div>
         </div>
       </div>
