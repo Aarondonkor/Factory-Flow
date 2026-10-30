@@ -4,12 +4,13 @@ import { BRAND } from '@/lib/brand'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { StaffInviteCodes } from '@/components/settings/StaffInviteCodes'
 
 export function SettingsPage() {
   const profile = useAuthStore((s) => s.profile)
 
   return (
-    <div className="page-shell space-y-6 max-w-2xl">
+    <div className="page-shell space-y-6 max-w-4xl">
       <PageHeader title="Settings" subtitle="Account and system preferences" />
 
       <Card title="Account Settings">
@@ -53,6 +54,8 @@ export function SettingsPage() {
           </div>
         </dl>
       </Card>
+
+      <StaffInviteCodes />
 
       <Card title="Admin Notes">
         <p className="text-sm leading-relaxed text-slate-600">

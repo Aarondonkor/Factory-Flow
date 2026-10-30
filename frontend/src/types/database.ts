@@ -315,3 +315,19 @@ export interface ProductRoll {
   created_at: string
   finished_goods?: FinishedGood
 }
+
+export interface StaffInviteCode {
+  id: string
+  code: string
+  role: UserRole
+  note: string | null
+  max_uses: number
+  use_count: number
+  expires_at: string
+  revoked: boolean
+  created_at: string
+  staff_invite_uses?: {
+    used_at: string
+    profiles?: { full_name: string | null; email: string } | null
+  }[]
+}

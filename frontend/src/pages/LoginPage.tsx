@@ -14,6 +14,7 @@ export function LoginPage() {
   const [fullName, setFullName] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [contactPhone, setContactPhone] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
   const [isForgot, setIsForgot] = useState(false)
   const [resetSent, setResetSent] = useState(false)
@@ -37,13 +38,19 @@ export function LoginPage() {
     }
 
     const result = isSignUp
-      ? await signUp(email, password, fullName, jobTitle, contactPhone)
+      ? await signUp(email, password, fullName, jobTitle, contactPhone, inviteCode.trim())
       : await signIn(email, password)
 
     setLoading(false)
 
     if (result.error) {
-      addToast(result.error, 'error')
+      // The auth service hides the database's own message behind this generic one.
+      // When a staff signup fails that way, the code is by far the most likely cause.
+      const friendly =
+        isSignUp && /database error saving new user/i.test(result.error)
+          ? "We couldn't create your account. Check that your signup code is correct, hasn't expired and hasn't already been used. Ask your administrator for a new code if needed."
+          : result.error
+      addToast(friendly, 'error')
     } else if (isSignUp) {
       addToast('Account created! Check your email to confirm.', 'success')
     }
@@ -146,6 +153,20 @@ export function LoginPage() {
                     onChange={(e) => setContactPhone(e.target.value)}
                     placeholder="024 000 0000"
                   />
+                  <div>
+                    <Input
+                      label="Signup Code"
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                      required
+                      placeholder="XXXX-XXXX-XXXX"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      Employees need a code from the administrator to create an account.
+                    </p>
+                  </div>
                 </>
               )}
               <Input

@@ -13,12 +13,15 @@ interface AuthState {
   setLoading: (loading: boolean) => void
   initialize: () => Promise<void>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  resetPassword: (email: string) => Promise<{ error: string | null }>
+  updatePassword: (password: string) => Promise<{ error: string | null }>
   signUp: (
     email: string,
     password: string,
     fullName: string,
     roleTitle?: string,
-    contactPhone?: string
+    contactPhone?: string,
+    inviteCode?: string
   ) => Promise<{ error: string | null }>
   signUpCustomer: (params: {
     email: string
@@ -80,11 +83,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return { error: error?.message ?? null }
   },
 
-  signUp: async (email, password, fullName, roleTitle, contactPhone) => {
+  // Sends a password-reset email. The link in it brings the person back to
+  // /reset-password with a temporary session so they can choose a new one.
+  resetPassword: async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    return { error: error?.message ?? null }
+  },
+
+  updatePassword: async (password) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    return { error: error?.message ?? null }
+  },
+
+  signUp: async (email, password, fullName, roleTitle, contactPhone, inviteCode) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, role_title: roleTitle, contact_phone: contactPhone } },
+      // The staff signup code is checked by the database when the account is created.
+      // The role is decided by the code, never by anything sent from here.
+      options: {
+        data: {
+          full_name: fullName,
+          role_title: roleTitle,
+          contact_phone: contactPhone,
+          invite_code: inviteCode,
+        },
+      },
     })
     return { error: error?.message ?? null }
   },
