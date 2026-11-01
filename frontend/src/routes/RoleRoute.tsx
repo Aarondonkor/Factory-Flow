@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 
-type Module = 'dashboard' | 'production' | 'inventory' | 'sales' | 'hr' | 'settings'
+type Module = 'dashboard' | 'production' | 'inventory' | 'sales' | 'hr' | 'accounts' | 'settings'
 
 export function RoleRoute({
   module,

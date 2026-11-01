@@ -7,6 +7,7 @@ import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { RoleRoute } from '@/routes/RoleRoute'
 import { RoleGate } from '@/routes/RoleGate'
 import { LoginPage } from '@/pages/LoginPage'
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { CustomerSignupPage } from '@/pages/customer/CustomerSignupPage'
 import { CustomerPortalPage } from '@/pages/customer/CustomerPortalPage'
 import { DashboardPage } from '@/pages/DashboardPage'
@@ -15,6 +16,7 @@ import { InventoryPage } from '@/pages/inventory/InventoryPage'
 import { SalesPage } from '@/pages/sales/SalesPage'
 import { HRPage } from '@/pages/hr/HRPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { AccountsPage } from '@/pages/accounts/AccountsPage'
 
 export default function App() {
   const initialize = useAuthStore((s) => s.initialize)
@@ -27,6 +29,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/customer/signup" element={<CustomerSignupPage />} />
 
         <Route
@@ -68,6 +71,14 @@ export default function App() {
             element={
               <RoleRoute module="hr">
                 <HRPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="accounts"
+            element={
+              <RoleRoute module="accounts">
+                <AccountsPage />
               </RoleRoute>
             }
           />
