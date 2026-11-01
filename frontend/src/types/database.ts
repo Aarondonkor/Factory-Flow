@@ -331,3 +331,31 @@ export interface StaffInviteCode {
     profiles?: { full_name: string | null; email: string } | null
   }[]
 }
+
+export interface Expense {
+  id: string
+  expense_date: string
+  category: string
+  description: string
+  amount: number
+  payment_method: 'cash' | 'mobile_money' | 'bank_transfer' | 'card' | 'cheque'
+  vendor: string | null
+  reference: string | null
+  notes: string | null
+  recorded_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface LedgerEntry {
+  entry_id: string
+  entry_date: string
+  entry_type: 'revenue' | 'expense'
+  category: string
+  description: string
+  amount: number
+  method: string | null
+  reference: string | null
+  source: 'payment' | 'expense' | 'payroll'
+  created_at: string
+}

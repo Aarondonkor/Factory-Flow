@@ -81,3 +81,27 @@ export function formatItemSpec(item: { specified_micron?: number | null }): stri
 export function formatKg(kg: number): string {
   return `${kg.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg`
 }
+
+export const EXPENSE_CATEGORIES = [
+  'Raw materials (resin, additives)',
+  'Packaging & printing inks',
+  'Salaries & wages',
+  'Electricity',
+  'Fuel & transport',
+  'Machine maintenance & spares',
+  'Rent',
+  'Taxes, levies & permits',
+  'Bank & Paystack fees',
+  'Marketing',
+  'Office & admin',
+  'Other',
+]
+
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  paystack: 'Paystack',
+  cash: 'Cash',
+  mobile_money: 'Mobile money',
+  bank_transfer: 'Bank transfer',
+  card: 'Card',
+  cheque: 'Cheque',
+}

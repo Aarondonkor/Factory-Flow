@@ -33,7 +33,7 @@ interface AuthState {
   }) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   hasRole: (...roles: UserRole[]) => boolean
-  canAccessModule: (module: 'dashboard' | 'production' | 'inventory' | 'sales' | 'hr' | 'settings') => boolean
+  canAccessModule: (module: 'dashboard' | 'production' | 'inventory' | 'sales' | 'hr' | 'accounts' | 'settings') => boolean
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -160,6 +160,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return role === 'sales_staff'
       case 'hr':
         return role === 'hr_officer' || role === 'staff'
+      case 'accounts':
+        return role === 'admin'
       case 'settings':
         return role === 'admin'
       default:

@@ -9,6 +9,7 @@ import {
   InventoryIcon,
   SalesIcon,
   HRIcon,
+  AccountsIcon,
   SettingsIcon,
 } from '@/components/icons/NavIcons'
 
@@ -18,6 +19,7 @@ const navItems = [
   { path: '/inventory', label: 'Inventory', Icon: InventoryIcon, module: 'inventory' as const },
   { path: '/sales', label: 'Sales', Icon: SalesIcon, module: 'sales' as const },
   { path: '/hr', label: 'HR', Icon: HRIcon, module: 'hr' as const },
+  { path: '/accounts', label: 'Accounts', Icon: AccountsIcon, module: 'accounts' as const },
   { path: '/settings', label: 'Settings', Icon: SettingsIcon, module: 'settings' as const },
 ]
 

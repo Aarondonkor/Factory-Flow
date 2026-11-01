@@ -49,6 +49,14 @@ export function SalesIcon(props: IconProps) {
   )
 }
 
+export function AccountsIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M5 4a2 2 0 012-2h12v18H7a2 2 0 01-2-2V4zM5 18a2 2 0 012-2h12M9 7h6M9 11h6" />
+    </IconBase>
+  )
+}
+
 export function HRIcon(props: IconProps) {
   return (
     <IconBase {...props}>
