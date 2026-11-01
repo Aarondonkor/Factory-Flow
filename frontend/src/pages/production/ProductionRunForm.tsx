@@ -44,6 +44,11 @@ export function ProductionRunForm({
   const semiFinishedGoods = finishedGoods.filter((g) => g.stage === 'semi_finished')
   const finishedOnlyGoods = finishedGoods.filter((g) => g.stage === 'finished')
 
+  // A machine whose name/code mentions "print" is a printing machine; anything
+  // else conversion-type defaults to cutting. The operator can still change it.
+  const guessProcess = (m?: Machine): ConversionProcessType =>
+    /print/i.test(`${m?.machine_code ?? ''} ${m?.name ?? ''}`) ? 'printing' : 'cutting'
+
   const initialMachine = machines[0]
   const initialIsConversion = initialMachine?.stage === 'conversion'
 
@@ -63,7 +68,7 @@ export function ProductionRunForm({
     output_unit: 'kg' as 'kg' | 'rolls',
     input_product_id: initialIsConversion ? (semiFinishedGoods[0]?.id || '') : '',
     input_quantity_consumed: '',
-    process_type: 'cutting' as ConversionProcessType,
+    process_type: guessProcess(initialMachine),
 
     formula_code: '',
     roll_count: '',
@@ -107,16 +112,22 @@ export function ProductionRunForm({
   const isPrinting = isConversion && form.process_type === 'printing'
   const isCutting = isConversion && form.process_type === 'cutting'
   const outputOptions = isConversion ? finishedOnlyGoods : semiFinishedGoods
-  const selectedInputProduct = semiFinishedGoods.find((g) => g.id === form.input_product_id)
+  const selectedInputProduct = finishedGoods.find((g) => g.id === form.input_product_id)
+  // Stage-matching products are listed first, but every other product stays
+  // selectable too: a product that was created before stages existed (or was
+  // saved with the wrong stage) must never be impossible to log against.
+  const otherOutputOptions = finishedGoods.filter((g) => !outputOptions.includes(g))
+  const otherInputOptions = finishedGoods.filter((g) => !semiFinishedGoods.includes(g))
   const qcIssueOptions = isPrinting ? PRINTING_QC_ISSUES : EXTRUSION_QC_ISSUES
   // Printing runs that produce a roll product log the weight of every roll,
   // e.g. "12.3, 14.6, 20, 11, 19.9". Each weight becomes one sellable roll.
   const outputProduct = finishedGoods.find((g) => g.id === form.finished_good_id)
-  const rollMode = isPrinting && outputProduct?.unit === 'rolls'
+  const showRollWeights = outputProduct?.unit === 'rolls' && !isCutting
   const parsedWeights = form.roll_weights_text
     .split(/[\s,;]+/)
     .filter((t) => t.length > 0)
     .map((t) => Number(t))
+  const rollMode = showRollWeights && (isPrinting || parsedWeights.length > 0)
   const weightsInvalid = parsedWeights.some((w) => !Number.isFinite(w) || w <= 0 || w > 500)
   const weightsTotal = parsedWeights.reduce((sum, w) => sum + (Number.isFinite(w) ? w : 0), 0)
   const proportionTotal = materials.reduce((sum, m) => sum + (parseFloat(m.proportion_pct) || 0), 0)
@@ -127,6 +138,7 @@ export function ProductionRunForm({
     setForm({
       ...form,
       machine_id: machineId,
+      process_type: guessProcess(machine),
       finished_good_id: (conversion ? finishedOnlyGoods[0]?.id : semiFinishedGoods[0]?.id) || '',
       input_product_id: conversion ? (semiFinishedGoods[0]?.id || '') : '',
       input_quantity_consumed: '',
@@ -316,10 +328,27 @@ export function ProductionRunForm({
           onChange={(e) => setForm({ ...form, finished_good_id: e.target.value })}
         >
           <option value="">— Select —</option>
-          {outputOptions.map((g) => (
-            <option key={g.id} value={g.id}>{g.product_name}</option>
-          ))}
+          {outputOptions.length > 0 && (
+            <optgroup label={isConversion ? 'Finished products' : 'Semi-finished products'}>
+              {outputOptions.map((g) => (
+                <option key={g.id} value={g.id}>{g.product_name}</option>
+              ))}
+            </optgroup>
+          )}
+          {otherOutputOptions.length > 0 && (
+            <optgroup label={`Other products (${isConversion ? 'not marked finished' : 'not marked semi-finished'})`}>
+              {otherOutputOptions.map((g) => (
+                <option key={g.id} value={g.id}>{g.product_name}</option>
+              ))}
+            </optgroup>
+          )}
         </Select>
+        {outputOptions.length === 0 && (
+          <p className="-mt-2 text-xs text-amber-700">
+            No product is marked {isConversion ? 'finished' : 'semi-finished'} yet, so all products are listed.
+            Set each product's stage in Inventory → Finished Goods.
+          </p>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <Input
@@ -341,57 +370,72 @@ export function ProductionRunForm({
           />
         </div>
 
-        {rollMode ? (
-          <div className="space-y-3">
+        {outputProduct && outputProduct.unit !== 'rolls' && isPrinting && (
+          <p className="-mt-2 text-xs text-amber-700">
+            {outputProduct.product_name} is counted in {outputProduct.unit}, so individual roll weights can't be
+            logged for it. Roll weights are only available for products counted in Rolls — an admin can change
+            this in Inventory → Finished Goods.
+          </p>
+        )}
+
+        <div className="space-y-3">
+          {showRollWeights && (
             <div>
-              <label className="label" htmlFor="roll-weights">Individual roll weights (kg)</label>
+              <label className="label" htmlFor="roll-weights">
+                Individual roll weights (kg){isPrinting ? '' : ' — optional'}
+              </label>
               <textarea
                 id="roll-weights"
                 className="input min-h-[5rem]"
                 value={form.roll_weights_text}
                 onChange={(e) => setForm({ ...form, roll_weights_text: e.target.value })}
                 placeholder="12.3, 14.6, 20, 11, 19.9"
-                required
+                required={isPrinting}
               />
               <p className={`mt-1 text-xs ${weightsInvalid ? 'text-red-600' : 'text-slate-500'}`}>
                 {weightsInvalid
                   ? 'Every weight must be a number above 0 and at most 500.'
                   : parsedWeights.length === 0
-                  ? `One weight per roll produced, separated by commas${outputProduct ? ` — logged against ${outputProduct.product_name}` : ''}.`
+                  ? `One weight per roll produced, separated by commas${
+                      isPrinting ? '' : ' (or leave blank and enter the quantity below)'
+                    }${outputProduct ? ` — logged against ${outputProduct.product_name}` : ''}.`
                   : `${parsedWeights.length} roll${parsedWeights.length === 1 ? '' : 's'} · ${weightsTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg total`}
               </p>
             </div>
+          )}
+
+          {rollMode ? (
             <Input
               label="Batch ID"
               value={form.batch_id}
               onChange={(e) => setForm({ ...form, batch_id: e.target.value })}
             />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Input
-              label="Output Quantity"
-              type="number"
-              step="0.01"
-              value={form.output_quantity}
-              onChange={(e) => setForm({ ...form, output_quantity: e.target.value })}
-              required
-            />
-            <Select
-              label="Output Unit"
-              value={form.output_unit}
-              onChange={(e) => setForm({ ...form, output_unit: e.target.value as 'kg' | 'rolls' })}
-            >
-              <option value="kg">Kilograms</option>
-              <option value="rolls">Rolls</option>
-            </Select>
-            <Input
-              label="Batch ID"
-              value={form.batch_id}
-              onChange={(e) => setForm({ ...form, batch_id: e.target.value })}
-            />
-          </div>
-        )}
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <Input
+                label="Output Quantity"
+                type="number"
+                step="0.01"
+                value={form.output_quantity}
+                onChange={(e) => setForm({ ...form, output_quantity: e.target.value })}
+                required
+              />
+              <Select
+                label="Output Unit"
+                value={form.output_unit}
+                onChange={(e) => setForm({ ...form, output_unit: e.target.value as 'kg' | 'rolls' })}
+              >
+                <option value="kg">Kilograms</option>
+                <option value="rolls">Rolls</option>
+              </Select>
+              <Input
+                label="Batch ID"
+                value={form.batch_id}
+                onChange={(e) => setForm({ ...form, batch_id: e.target.value })}
+              />
+            </div>
+          )}
+        </div>
 
         {isConversion ? (
           <div className="border-t pt-4">
@@ -404,11 +448,24 @@ export function ProductionRunForm({
                 required
               >
                 <option value="">— Select —</option>
-                {semiFinishedGoods.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.product_name} ({g.current_stock} {g.unit} available)
-                  </option>
-                ))}
+                {semiFinishedGoods.length > 0 && (
+                  <optgroup label="Semi-finished products">
+                    {semiFinishedGoods.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.product_name} ({g.current_stock} {g.unit} available)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {otherInputOptions.length > 0 && (
+                  <optgroup label="Other products (not marked semi-finished)">
+                    {otherInputOptions.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.product_name} ({g.current_stock} {g.unit} available)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </Select>
               <Input
                 label={`Quantity Consumed${selectedInputProduct ? ` (${selectedInputProduct.unit})` : ''}`}

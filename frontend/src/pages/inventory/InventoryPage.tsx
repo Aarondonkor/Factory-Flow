@@ -61,6 +61,30 @@ export function InventoryPage() {
 
   useAutoRefresh(() => fetchData(true), 20000)
 
+  // Lets an admin fix a product that was saved with the wrong unit (e.g. a roll
+  // product saved as kg). The stock number is NOT converted, so it is confirmed first.
+  const setUnit = async (g: FinishedGood, unit: 'kg' | 'rolls') => {
+    const ok = window.confirm(
+      `Count "${g.product_name}" in ${unit} instead of ${g.unit}?\n\nThe current stock figure (${g.current_stock}) will be read as ${unit}, not converted. Adjust the stock afterwards if it is wrong.`
+    )
+    if (!ok) return
+    const { error } = await supabase.from('finished_goods').update({ unit }).eq('id', g.id)
+    if (error) addToast(error.message, 'error')
+    else {
+      addToast(`Now counted in ${unit}`)
+      fetchData()
+    }
+  }
+
+  const setStage = async (id: string, stage: 'semi_finished' | 'finished') => {
+    const { error } = await supabase.from('finished_goods').update({ stage }).eq('id', id)
+    if (error) addToast(error.message, 'error')
+    else {
+      addToast(stage === 'semi_finished' ? 'Marked as semi-finished' : 'Marked as finished')
+      fetchData()
+    }
+  }
+
   const toggleOrderable = async (id: string, next: boolean) => {
     const { error } = await supabase.from('finished_goods').update({ customer_orderable: next }).eq('id', id)
     if (error) addToast(error.message, 'error')
@@ -200,6 +224,17 @@ export function InventoryPage() {
                         <Button variant="secondary" onClick={() => toggleOrderable(g.id, !g.customer_orderable)}>
                           {g.customer_orderable ? 'Hide from Portal' : 'Show in Portal'}
                         </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => setStage(g.id, g.stage === 'semi_finished' ? 'finished' : 'semi_finished')}
+                        >
+                          {g.stage === 'semi_finished' ? 'Mark Finished' : 'Mark Semi-Finished'}
+                        </Button>
+                        {g.unit !== 'bundle' && (
+                          <Button variant="secondary" onClick={() => setUnit(g, g.unit === 'rolls' ? 'kg' : 'rolls')}>
+                            {g.unit === 'rolls' ? 'Count in kg' : 'Count in rolls'}
+                          </Button>
+                        )}
                       </div>
                     ) : null,
                   ]}
@@ -223,13 +258,31 @@ export function InventoryPage() {
                         <p className="text-xs font-semibold text-slate-700">{formatCurrency(g.unit_price)} / {g.unit}</p>
                       )}
                       {isAdmin && (
-                        <Button
-                          variant="secondary"
-                          className="w-full"
-                          onClick={() => toggleOrderable(g.id, !g.customer_orderable)}
-                        >
-                          {g.customer_orderable ? 'Hide from Portal' : 'Show in Portal'}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="secondary"
+                            className="flex-1"
+                            onClick={() => toggleOrderable(g.id, !g.customer_orderable)}
+                          >
+                            {g.customer_orderable ? 'Hide from Portal' : 'Show in Portal'}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            className="flex-1"
+                            onClick={() => setStage(g.id, g.stage === 'semi_finished' ? 'finished' : 'semi_finished')}
+                          >
+                            {g.stage === 'semi_finished' ? 'Mark Finished' : 'Mark Semi-Finished'}
+                          </Button>
+                          {g.unit !== 'bundle' && (
+                            <Button
+                              variant="secondary"
+                              className="flex-1"
+                              onClick={() => setUnit(g, g.unit === 'rolls' ? 'kg' : 'rolls')}
+                            >
+                              {g.unit === 'rolls' ? 'Count in kg' : 'Count in rolls'}
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </div>
                   }

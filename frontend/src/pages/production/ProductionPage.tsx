@@ -7,13 +7,15 @@ import type { ProductionRun, MachineDowntime, Machine, RawMaterial, FinishedGood
 import { formatDate, formatNumber, SHIFT_LABELS } from '@/lib/format'
 import { Card, StatCard } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 import { ResponsiveTable, TableRow } from '@/components/ui/Table'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { PageTabs } from '@/components/ui/PageTabs'
 import { ProductionRunForm } from './ProductionRunForm'
 import { DowntimeForm } from './DowntimeForm'
+import { MachineFormModal } from './MachineFormModal'
 
-type Tab = 'runs' | 'downtime' | 'summary'
+type Tab = 'runs' | 'downtime' | 'machines' | 'summary'
 
 export function ProductionPage() {
   const [tab, setTab] = useState<Tab>('runs')
@@ -25,8 +27,10 @@ export function ProductionPage() {
   const [loading, setLoading] = useState(true)
   const [showRunForm, setShowRunForm] = useState(false)
   const [showDowntimeForm, setShowDowntimeForm] = useState(false)
+  const [showMachineForm, setShowMachineForm] = useState(false)
 
   const canWrite = useAuthStore((s) => s.hasRole('admin', 'production_supervisor'))
+  const isAdmin = useAuthStore((s) => s.hasRole('admin'))
   const addToast = useToastStore((s) => s.addToast)
 
   const fetchData = async (silent = false) => {
@@ -44,7 +48,7 @@ export function ProductionPage() {
         .select('*, machines(machine_code, name)')
         .order('start_time', { ascending: false })
         .limit(50),
-      supabase.from('machines').select('*').eq('is_active', true),
+      supabase.from('machines').select('*').order('machine_code'),
       supabase.from('raw_materials').select('*').order('name'),
       supabase.from('finished_goods').select('*').order('product_name'),
     ])
@@ -59,6 +63,15 @@ export function ProductionPage() {
     setRawMaterials(rawRes.data || [])
     setFinishedGoods(finRes.data || [])
     if (!silent) setLoading(false)
+  }
+
+  const updateMachine = async (id: string, patch: { stage?: 'extrusion' | 'conversion'; is_active?: boolean }) => {
+    const { error } = await supabase.from('machines').update(patch).eq('id', id)
+    if (error) addToast(error.message, 'error')
+    else {
+      addToast('Machine updated')
+      fetchData()
+    }
   }
 
   useEffect(() => {
@@ -83,6 +96,7 @@ export function ProductionPage() {
   const tabs = [
     { id: 'runs' as const, label: 'Production Runs' },
     { id: 'downtime' as const, label: 'Downtime Log' },
+    { id: 'machines' as const, label: 'Machines' },
     { id: 'summary' as const, label: 'Summary' },
   ]
 
@@ -109,6 +123,10 @@ export function ProductionPage() {
           ) : canWrite && tab === 'downtime' ? (
             <Button variant="secondary" onClick={() => setShowDowntimeForm(true)}>
               + Log Downtime
+            </Button>
+          ) : canWrite && tab === 'machines' ? (
+            <Button variant="secondary" onClick={() => setShowMachineForm(true)}>
+              + Add Machine
             </Button>
           ) : undefined
         }
@@ -156,6 +174,76 @@ export function ProductionPage() {
                 />
               )
             })}
+          </ResponsiveTable>
+        </Card>
+      )}
+
+      {tab === 'machines' && (
+        <Card title="Machines">
+          <p className="mb-4 text-sm text-slate-500">
+            Extrusion machines make rolls from raw materials. Conversion machines (printing, cutting and sealing)
+            turn a semi-finished roll into a finished product — add your printing machine here as a Conversion machine.
+          </p>
+          <ResponsiveTable
+            headers={['Code', 'Name', 'Type', 'Status', 'Actions']}
+            isEmpty={machines.length === 0}
+            emptyMessage="No machines yet"
+          >
+            {machines.map((m) => (
+              <TableRow
+                key={m.id}
+                cells={[
+                  m.machine_code,
+                  m.name,
+                  <Badge variant={m.stage === 'conversion' ? 'info' : 'default'}>
+                    {m.stage === 'conversion' ? 'Conversion' : 'Extrusion'}
+                  </Badge>,
+                  <Badge variant={m.is_active ? 'success' : 'warning'}>{m.is_active ? 'Active' : 'Inactive'}</Badge>,
+                  isAdmin ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => updateMachine(m.id, { stage: m.stage === 'conversion' ? 'extrusion' : 'conversion' })}
+                      >
+                        {m.stage === 'conversion' ? 'Make Extrusion' : 'Make Conversion'}
+                      </Button>
+                      <Button variant="secondary" onClick={() => updateMachine(m.id, { is_active: !m.is_active })}>
+                        {m.is_active ? 'Deactivate' : 'Activate'}
+                      </Button>
+                    </div>
+                  ) : null,
+                ]}
+                mobileCard={
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{m.machine_code} · {m.name}</span>
+                      <Badge variant={m.is_active ? 'success' : 'warning'}>{m.is_active ? 'Active' : 'Inactive'}</Badge>
+                    </div>
+                    <Badge variant={m.stage === 'conversion' ? 'info' : 'default'}>
+                      {m.stage === 'conversion' ? 'Conversion' : 'Extrusion'}
+                    </Badge>
+                    {isAdmin && (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          className="flex-1"
+                          onClick={() => updateMachine(m.id, { stage: m.stage === 'conversion' ? 'extrusion' : 'conversion' })}
+                        >
+                          {m.stage === 'conversion' ? 'Make Extrusion' : 'Make Conversion'}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          className="flex-1"
+                          onClick={() => updateMachine(m.id, { is_active: !m.is_active })}
+                        >
+                          {m.is_active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                }
+              />
+            ))}
           </ResponsiveTable>
         </Card>
       )}
@@ -218,7 +306,7 @@ export function ProductionPage() {
 
       {showRunForm && (
         <ProductionRunForm
-          machines={machines}
+          machines={machines.filter((m) => m.is_active)}
           rawMaterials={rawMaterials}
           finishedGoods={finishedGoods}
           onClose={() => setShowRunForm(false)}
@@ -230,9 +318,20 @@ export function ProductionPage() {
         />
       )}
 
+      {showMachineForm && (
+        <MachineFormModal
+          onClose={() => setShowMachineForm(false)}
+          onSuccess={() => {
+            setShowMachineForm(false)
+            fetchData()
+            addToast('Machine added')
+          }}
+        />
+      )}
+
       {showDowntimeForm && (
         <DowntimeForm
-          machines={machines}
+          machines={machines.filter((m) => m.is_active)}
           onClose={() => setShowDowntimeForm(false)}
           onSuccess={() => {
             setShowDowntimeForm(false)
