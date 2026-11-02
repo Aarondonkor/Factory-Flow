@@ -30,6 +30,219 @@ function emptyMaterialLine(rawMaterials: RawMaterial[]): MaterialLine {
   return { raw_material_id: rawMaterials[0]?.id || '', quantity_kg: '', proportion_pct: '' }
 }
 
+interface BrandBlock {
+  finished_good_id: string
+  film_thickness: string
+  film_width: string
+  film_color: string
+  roll_weights_text: string
+  output_quantity: string
+  output_unit: 'kg' | 'rolls'
+  input_product_id: string
+  input_quantity_consumed: string
+  batch_id: string
+  quality_grade: string
+  waste_quantity: string
+}
+
+// "12.3, 14.6, 20, 11, 19.9" -> the individual roll weights
+function parseWeightList(text: string) {
+  const list = text
+    .split(/[\s,;]+/)
+    .filter((t) => t.length > 0)
+    .map((t) => Number(t))
+  const invalid = list.some((w) => !Number.isFinite(w) || w <= 0 || w > 500)
+  const total = list.reduce((sum, w) => sum + (Number.isFinite(w) ? w : 0), 0)
+  return { list, invalid, total }
+}
+
+interface BrandCardProps {
+  index: number
+  brand: BrandBlock
+  products: FinishedGood[]
+  canRemove: boolean
+  onChange: (patch: Partial<BrandBlock>) => void
+  onRemove: () => void
+}
+
+// One brand printed in a run: its own product, roll weights, the semi-finished
+// roll it used, and its own batch, grade and waste.
+function BrandCard({ index, brand, products, canRemove, onChange, onRemove }: BrandCardProps) {
+  const finished = products.filter((g) => g.stage === 'finished')
+  const semi = products.filter((g) => g.stage === 'semi_finished')
+  const otherOut = products.filter((g) => g.stage !== 'finished')
+  const otherIn = products.filter((g) => g.stage !== 'semi_finished')
+  const product = products.find((g) => g.id === brand.finished_good_id)
+  const inputProduct = products.find((g) => g.id === brand.input_product_id)
+  const isRolls = product?.unit === 'rolls'
+  const weights = parseWeightList(brand.roll_weights_text)
+
+  return (
+    <div className="space-y-4 rounded-xl border border-slate-200 p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-slate-800">Brand {index + 1}</p>
+        {canRemove && (
+          <Button type="button" variant="secondary" onClick={onRemove}>
+            Remove
+          </Button>
+        )}
+      </div>
+
+      <Select
+        label="Branded product (output)"
+        value={brand.finished_good_id}
+        onChange={(e) => onChange({ finished_good_id: e.target.value })}
+        required
+      >
+        <option value="">— Select —</option>
+        {finished.length > 0 && (
+          <optgroup label="Finished products">
+            {finished.map((g) => (
+              <option key={g.id} value={g.id}>{g.product_name}</option>
+            ))}
+          </optgroup>
+        )}
+        {otherOut.length > 0 && (
+          <optgroup label="Other products (not marked finished)">
+            {otherOut.map((g) => (
+              <option key={g.id} value={g.id}>{g.product_name}</option>
+            ))}
+          </optgroup>
+        )}
+      </Select>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <Input
+          label="Thickness (µ)"
+          type="number"
+          value={brand.film_thickness}
+          onChange={(e) => onChange({ film_thickness: e.target.value })}
+        />
+        <Input
+          label="Width (mm)"
+          type="number"
+          value={brand.film_width}
+          onChange={(e) => onChange({ film_width: e.target.value })}
+        />
+        <Input
+          label="Color"
+          value={brand.film_color}
+          onChange={(e) => onChange({ film_color: e.target.value })}
+        />
+      </div>
+
+      {product && !isRolls ? (
+        <div className="space-y-2">
+          <p className="text-xs text-amber-700">
+            {product.product_name} is counted in {product.unit}, so individual roll weights can't be logged for it.
+            Roll weights are only available for products counted in Rolls — an admin can change this in Inventory →
+            Finished Goods.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Output Quantity"
+              type="number"
+              step="0.01"
+              value={brand.output_quantity}
+              onChange={(e) => onChange({ output_quantity: e.target.value })}
+              required
+            />
+            <Select
+              label="Output Unit"
+              value={brand.output_unit}
+              onChange={(e) => onChange({ output_unit: e.target.value as 'kg' | 'rolls' })}
+            >
+              <option value="kg">Kilograms</option>
+              <option value="rolls">Rolls</option>
+            </Select>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <label className="label" htmlFor={`brand-weights-${index}`}>Individual roll weights (kg)</label>
+          <textarea
+            id={`brand-weights-${index}`}
+            className="input min-h-[5rem]"
+            value={brand.roll_weights_text}
+            onChange={(e) => onChange({ roll_weights_text: e.target.value })}
+            placeholder="12.3, 14.6, 20, 11, 19.9"
+            required
+          />
+          <p className={`mt-1 text-xs ${weights.invalid ? 'text-red-600' : 'text-slate-500'}`}>
+            {weights.invalid
+              ? 'Every weight must be a number above 0 and at most 500.'
+              : weights.list.length === 0
+              ? `One weight per roll printed for this brand, separated by commas${product ? ` — logged against ${product.product_name}` : ''}.`
+              : `${weights.list.length} roll${weights.list.length === 1 ? '' : 's'} · ${weights.total.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg total`}
+          </p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Select
+          label="Semi-finished roll used (input)"
+          value={brand.input_product_id}
+          onChange={(e) => onChange({ input_product_id: e.target.value })}
+          required
+        >
+          <option value="">— Select —</option>
+          {semi.length > 0 && (
+            <optgroup label="Semi-finished products">
+              {semi.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.product_name} ({g.current_stock} {g.unit} available)
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {otherIn.length > 0 && (
+            <optgroup label="Other products (not marked semi-finished)">
+              {otherIn.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.product_name} ({g.current_stock} {g.unit} available)
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </Select>
+        <Input
+          label={`Quantity consumed${inputProduct ? ` (${inputProduct.unit})` : ''}`}
+          type="number"
+          step="0.01"
+          value={brand.input_quantity_consumed}
+          onChange={(e) => onChange({ input_quantity_consumed: e.target.value })}
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <Input
+          label="Batch ID"
+          value={brand.batch_id}
+          onChange={(e) => onChange({ batch_id: e.target.value })}
+        />
+        <Select
+          label="Quality Grade (1–3)"
+          value={brand.quality_grade}
+          onChange={(e) => onChange({ quality_grade: e.target.value })}
+        >
+          <option value="">—</option>
+          <option value="1">1 — Best</option>
+          <option value="2">2</option>
+          <option value="3">3 — Lowest</option>
+        </Select>
+        <Input
+          label="Waste / Scrap (kg)"
+          type="number"
+          step="0.01"
+          value={brand.waste_quantity}
+          onChange={(e) => onChange({ waste_quantity: e.target.value })}
+        />
+      </div>
+    </div>
+  )
+}
+
 export function ProductionRunForm({
   machines,
   rawMaterials,
@@ -53,6 +266,25 @@ export function ProductionRunForm({
   const initialIsConversion = initialMachine?.stage === 'conversion'
 
   const [materials, setMaterials] = useState<MaterialLine[]>([emptyMaterialLine(rawMaterials)])
+
+  // Printing runs can print several brands at once; each gets its own card.
+  const newBrand = (): BrandBlock => ({
+    finished_good_id: finishedOnlyGoods[0]?.id || '',
+    film_thickness: '',
+    film_width: '',
+    film_color: '',
+    roll_weights_text: '',
+    output_quantity: '',
+    output_unit: 'rolls',
+    input_product_id: semiFinishedGoods[0]?.id || '',
+    input_quantity_consumed: '',
+    batch_id: '',
+    quality_grade: '',
+    waste_quantity: '0',
+  })
+  const [brands, setBrands] = useState<BrandBlock[]>([newBrand()])
+  const updateBrand = (index: number, patch: Partial<BrandBlock>) =>
+    setBrands((prev) => prev.map((b, i) => (i === index ? { ...b, ...patch } : b)))
 
   const [form, setForm] = useState({
     run_date: toInputDate(),
@@ -145,6 +377,7 @@ export function ProductionRunForm({
       qc_issues: [],
     })
     setMaterials([emptyMaterialLine(rawMaterials)])
+    setBrands([newBrand()])
   }
 
   const updateMaterial = (index: number, patch: Partial<MaterialLine>) => {
@@ -161,83 +394,157 @@ export function ProductionRunForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (rollMode && (parsedWeights.length === 0 || weightsInvalid)) {
-      addToast('Enter the weight of each roll in kg, separated by commas (e.g. 12.3, 14.6, 20)', 'error')
-      return
+    // What differs per row: one row per brand on a printing run, a single row otherwise.
+    interface RowBrand {
+      finished_good_id: string | null
+      film_thickness: number | null
+      film_width: number | null
+      film_color: string | null
+      output_quantity: number
+      output_unit: 'kg' | 'rolls'
+      roll_weights: number[] | null
+      input_product_id: string | null
+      input_quantity_consumed: number
+      batch_id: string | null
+      quality_grade: number | null
+      waste_quantity: number
+    }
+
+    let brandRows: RowBrand[]
+
+    if (isPrinting) {
+      for (let i = 0; i < brands.length; i++) {
+        const b = brands[i]
+        const label = `Brand ${i + 1}`
+        const product = finishedGoods.find((g) => g.id === b.finished_good_id)
+        if (!product) {
+          addToast(`${label}: choose the branded product`, 'error')
+          return
+        }
+        if (!b.input_product_id || !(parseFloat(b.input_quantity_consumed) > 0)) {
+          addToast(`${label}: choose the semi-finished roll used and how much was consumed`, 'error')
+          return
+        }
+        if (product.unit === 'rolls') {
+          const w = parseWeightList(b.roll_weights_text)
+          if (w.list.length === 0 || w.invalid) {
+            addToast(`${label}: enter the weight of each roll in kg, separated by commas (e.g. 12.3, 14.6, 20)`, 'error')
+            return
+          }
+        } else if (!(parseFloat(b.output_quantity) > 0)) {
+          addToast(`${label}: enter the output quantity`, 'error')
+          return
+        }
+      }
+
+      brandRows = brands.map((b) => {
+        const product = finishedGoods.find((g) => g.id === b.finished_good_id)
+        const asRolls = product?.unit === 'rolls'
+        const w = parseWeightList(b.roll_weights_text)
+        return {
+          finished_good_id: b.finished_good_id || null,
+          film_thickness: b.film_thickness ? parseFloat(b.film_thickness) : null,
+          film_width: b.film_width ? parseFloat(b.film_width) : null,
+          film_color: b.film_color || null,
+          output_quantity: asRolls ? w.list.length : parseFloat(b.output_quantity),
+          output_unit: asRolls ? 'rolls' : b.output_unit,
+          roll_weights: asRolls ? w.list : null,
+          input_product_id: b.input_product_id || null,
+          input_quantity_consumed: parseFloat(b.input_quantity_consumed) || 0,
+          batch_id: b.batch_id || null,
+          quality_grade: b.quality_grade ? parseInt(b.quality_grade, 10) : null,
+          waste_quantity: parseFloat(b.waste_quantity) || 0,
+        }
+      })
+    } else {
+      if (rollMode && (parsedWeights.length === 0 || weightsInvalid)) {
+        addToast('Enter the weight of each roll in kg, separated by commas (e.g. 12.3, 14.6, 20)', 'error')
+        return
+      }
+
+      brandRows = [
+        {
+          finished_good_id: form.finished_good_id || null,
+          film_thickness: form.film_thickness ? parseFloat(form.film_thickness) : null,
+          film_width: form.film_width ? parseFloat(form.film_width) : null,
+          film_color: form.film_color || null,
+          output_quantity: rollMode ? parsedWeights.length : parseFloat(form.output_quantity),
+          output_unit: rollMode ? 'rolls' : form.output_unit,
+          roll_weights: rollMode ? parsedWeights : null,
+          input_product_id: isConversion ? (form.input_product_id || null) : null,
+          input_quantity_consumed: isConversion ? (parseFloat(form.input_quantity_consumed) || 0) : 0,
+          batch_id: form.batch_id || null,
+          quality_grade: form.quality_grade ? parseInt(form.quality_grade, 10) : null,
+          waste_quantity: parseFloat(form.waste_quantity) || 0,
+        },
+      ]
     }
 
     setLoading(true)
 
-    const { data: run, error } = await supabase
-      .from('production_runs')
-      .insert({
-        run_date: form.run_date,
-        shift: form.shift,
-        machine_id: form.machine_id,
-        operator_name: form.operator_name,
-        supervisor_name: form.supervisor_name || null,
-        finished_good_id: form.finished_good_id || null,
-        film_thickness: form.film_thickness ? parseFloat(form.film_thickness) : null,
-        film_width: form.film_width ? parseFloat(form.film_width) : null,
-        film_color: form.film_color || null,
-        output_quantity: rollMode ? parsedWeights.length : parseFloat(form.output_quantity),
-        output_unit: rollMode ? 'rolls' : form.output_unit,
-        roll_weights: rollMode ? parsedWeights : null,
-        input_product_id: isConversion ? (form.input_product_id || null) : null,
-        input_quantity_consumed: isConversion ? (parseFloat(form.input_quantity_consumed) || 0) : 0,
-        process_type: isConversion ? form.process_type : null,
+    // Brands of one printing session share a group id so they show up as one run.
+    const runGroupId = isPrinting ? crypto.randomUUID() : null
 
-        formula_code: !isConversion ? (form.formula_code || null) : null,
-        roll_count: !isConversion && form.roll_count ? parseInt(form.roll_count, 10) : null,
-        roll_length: !isConversion && form.roll_length ? parseFloat(form.roll_length) : null,
-        avg_weight_per_roll: !isConversion && form.avg_weight_per_roll ? parseFloat(form.avg_weight_per_roll) : null,
-        start_time: !isConversion ? (form.start_time || null) : null,
-        end_time: !isConversion ? (form.end_time || null) : null,
-        total_runtime_hours: !isConversion && form.total_runtime_hours ? parseFloat(form.total_runtime_hours) : null,
-        downtime_hours: parseFloat(form.downtime_hours) || 0,
-        temp_z1: !isConversion && form.temp_z1 ? parseFloat(form.temp_z1) : null,
-        temp_z2: !isConversion && form.temp_z2 ? parseFloat(form.temp_z2) : null,
-        temp_z3: !isConversion && form.temp_z3 ? parseFloat(form.temp_z3) : null,
-        temp_z4: !isConversion && form.temp_z4 ? parseFloat(form.temp_z4) : null,
-        temp_z5: !isConversion && form.temp_z5 ? parseFloat(form.temp_z5) : null,
-        temp_z6: !isConversion && form.temp_z6 ? parseFloat(form.temp_z6) : null,
-        screw_speed_rpm: !isConversion && form.screw_speed_rpm ? parseFloat(form.screw_speed_rpm) : null,
-        line_speed_mpm: !isConversion && form.line_speed_mpm ? parseFloat(form.line_speed_mpm) : null,
+    const rows = brandRows.map((b, i) => ({
+      run_group_id: runGroupId,
+      run_date: form.run_date,
+      shift: form.shift,
+      machine_id: form.machine_id,
+      operator_name: form.operator_name,
+      supervisor_name: form.supervisor_name || null,
+      ...b,
+      process_type: isConversion ? form.process_type : null,
 
-        cut_length_mm: isCutting && form.cut_length_mm ? parseFloat(form.cut_length_mm) : null,
-        bottom_seal_offset_mm: isCutting && form.bottom_seal_offset_mm ? parseFloat(form.bottom_seal_offset_mm) : null,
-        cutting_speed_cpm: isCutting && form.cutting_speed_cpm ? parseFloat(form.cutting_speed_cpm) : null,
+      formula_code: !isConversion ? (form.formula_code || null) : null,
+      roll_count: !isConversion && form.roll_count ? parseInt(form.roll_count, 10) : null,
+      roll_length: !isConversion && form.roll_length ? parseFloat(form.roll_length) : null,
+      avg_weight_per_roll: !isConversion && form.avg_weight_per_roll ? parseFloat(form.avg_weight_per_roll) : null,
+      start_time: !isConversion ? (form.start_time || null) : null,
+      end_time: !isConversion ? (form.end_time || null) : null,
+      total_runtime_hours: !isConversion && form.total_runtime_hours ? parseFloat(form.total_runtime_hours) : null,
+      // Downtime and notes belong to the run as a whole: store them once so they aren't double counted.
+      downtime_hours: i === 0 ? parseFloat(form.downtime_hours) || 0 : 0,
+      temp_z1: !isConversion && form.temp_z1 ? parseFloat(form.temp_z1) : null,
+      temp_z2: !isConversion && form.temp_z2 ? parseFloat(form.temp_z2) : null,
+      temp_z3: !isConversion && form.temp_z3 ? parseFloat(form.temp_z3) : null,
+      temp_z4: !isConversion && form.temp_z4 ? parseFloat(form.temp_z4) : null,
+      temp_z5: !isConversion && form.temp_z5 ? parseFloat(form.temp_z5) : null,
+      temp_z6: !isConversion && form.temp_z6 ? parseFloat(form.temp_z6) : null,
+      screw_speed_rpm: !isConversion && form.screw_speed_rpm ? parseFloat(form.screw_speed_rpm) : null,
+      line_speed_mpm: !isConversion && form.line_speed_mpm ? parseFloat(form.line_speed_mpm) : null,
 
-        print_colours_count: isPrinting && form.print_colours_count ? parseInt(form.print_colours_count, 10) : null,
-        print_speed: isPrinting && form.print_speed ? parseFloat(form.print_speed) : null,
-        print_tension: isPrinting && form.print_tension ? parseFloat(form.print_tension) : null,
-        cleaned_rollers: isPrinting ? form.cleaned_rollers : null,
-        roll_edges_ok: isPrinting ? form.roll_edges_ok : null,
-        neatness_rating: isPrinting && form.neatness_rating ? parseInt(form.neatness_rating, 10) : null,
+      cut_length_mm: isCutting && form.cut_length_mm ? parseFloat(form.cut_length_mm) : null,
+      bottom_seal_offset_mm: isCutting && form.bottom_seal_offset_mm ? parseFloat(form.bottom_seal_offset_mm) : null,
+      cutting_speed_cpm: isCutting && form.cutting_speed_cpm ? parseFloat(form.cutting_speed_cpm) : null,
 
-        samples_tested: !isPrinting && form.samples_tested ? parseInt(form.samples_tested, 10) : null,
-        samples_passed: !isPrinting && form.samples_passed ? parseInt(form.samples_passed, 10) : null,
-        samples_failed: !isPrinting && form.samples_failed ? parseInt(form.samples_failed, 10) : null,
-        qc_issues: form.qc_issues.length > 0 ? form.qc_issues : null,
-        qc_issue_other: form.qc_issue_other || null,
+      print_colours_count: isPrinting && form.print_colours_count ? parseInt(form.print_colours_count, 10) : null,
+      print_speed: isPrinting && form.print_speed ? parseFloat(form.print_speed) : null,
+      print_tension: isPrinting && form.print_tension ? parseFloat(form.print_tension) : null,
+      cleaned_rollers: isPrinting ? form.cleaned_rollers : null,
+      roll_edges_ok: isPrinting ? form.roll_edges_ok : null,
+      neatness_rating: isPrinting && form.neatness_rating ? parseInt(form.neatness_rating, 10) : null,
 
-        batch_id: form.batch_id || null,
-        quality_grade: form.quality_grade ? parseInt(form.quality_grade, 10) : null,
+      samples_tested: i === 0 && !isPrinting && form.samples_tested ? parseInt(form.samples_tested, 10) : null,
+      samples_passed: i === 0 && !isPrinting && form.samples_passed ? parseInt(form.samples_passed, 10) : null,
+      samples_failed: i === 0 && !isPrinting && form.samples_failed ? parseInt(form.samples_failed, 10) : null,
+      qc_issues: form.qc_issues.length > 0 ? form.qc_issues : null,
+      qc_issue_other: form.qc_issue_other || null,
 
-        waste_quantity: parseFloat(form.waste_quantity) || 0,
-        notes: form.notes || null,
-        created_by: user?.id,
-      })
-      .select('id')
-      .single()
+      notes: i === 0 ? form.notes || null : null,
+      created_by: user?.id,
+    }))
 
-    if (error) {
+    // One request = one transaction: every brand is saved, or none is.
+    const { data: inserted, error } = await supabase.from('production_runs').insert(rows).select('id')
+
+    if (error || !inserted || inserted.length === 0) {
       setLoading(false)
-      addToast(error.message, 'error')
+      addToast(error?.message || 'The run could not be saved', 'error')
       return
     }
 
     if (!isConversion) {
+      const run = inserted[0]
       const materialRows = materials
         .filter((m) => m.raw_material_id && parseFloat(m.quantity_kg) > 0)
         .map((m) => ({
@@ -322,6 +629,44 @@ export function ProductionRunForm({
           />
         </div>
 
+        {isPrinting && (
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Brands printed in this run</p>
+              <p className="text-xs text-slate-500">
+                Add a card for each brand printed in this run. Each brand keeps its own roll weights, semi-finished
+                roll used, batch, grade and waste.
+              </p>
+            </div>
+            {brands.map((b, i) => (
+              <BrandCard
+                key={i}
+                index={i}
+                brand={b}
+                products={finishedGoods}
+                canRemove={brands.length > 1}
+                onChange={(patch) => updateBrand(i, patch)}
+                onRemove={() => setBrands((prev) => prev.filter((_, idx) => idx !== i))}
+              />
+            ))}
+            <Button type="button" variant="secondary" onClick={() => setBrands((prev) => [...prev, newBrand()])}>
+              + Add another brand
+            </Button>
+            {brands.length > 1 && (
+              <p className="text-xs text-slate-500">
+                {brands.length} brands ·{' '}
+                {brands.reduce((n, b) => n + parseWeightList(b.roll_weights_text).list.length, 0)} rolls ·{' '}
+                {brands
+                  .reduce((kg, b) => kg + parseWeightList(b.roll_weights_text).total, 0)
+                  .toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                kg in total
+              </p>
+            )}
+          </div>
+        )}
+
+        {!isPrinting && (
+          <>
         <Select
           label={isConversion ? 'Finished Product (output)' : 'Semi-Finished Product (output)'}
           value={form.finished_good_id}
@@ -437,9 +782,15 @@ export function ProductionRunForm({
           )}
         </div>
 
+          </>
+        )}
+
         {isConversion ? (
           <div className="border-t pt-4">
-            <p className="text-sm font-medium text-slate-700 mb-3">Semi-Finished Input</p>
+            <p className="text-sm font-medium text-slate-700 mb-3">
+              {isPrinting ? 'Printing Parameters' : 'Semi-Finished Input'}
+            </p>
+            {!isPrinting && (
             <div className="grid grid-cols-2 gap-4">
               <Select
                 label="Semi-Finished Roll (input)"
@@ -476,6 +827,7 @@ export function ProductionRunForm({
                 required
               />
             </div>
+            )}
 
             {isCutting && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
@@ -741,6 +1093,7 @@ export function ProductionRunForm({
           )}
         </div>
 
+        {!isPrinting && (
         <div className="grid grid-cols-2 gap-4">
           <Select
             label="Quality Grade (1–3)"
@@ -760,6 +1113,7 @@ export function ProductionRunForm({
             onChange={(e) => setForm({ ...form, waste_quantity: e.target.value })}
           />
         </div>
+        )}
 
         <Input
           label="Remarks / Notes"

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { useAuthStore } from '@/stores/authStore'
@@ -14,6 +14,7 @@ import { PageTabs } from '@/components/ui/PageTabs'
 import { ProductionRunForm } from './ProductionRunForm'
 import { DowntimeForm } from './DowntimeForm'
 import { MachineFormModal } from './MachineFormModal'
+import { ProductionRunDetailModal } from './ProductionRunDetailModal'
 
 type Tab = 'runs' | 'downtime' | 'machines' | 'summary'
 
@@ -28,6 +29,7 @@ export function ProductionPage() {
   const [showRunForm, setShowRunForm] = useState(false)
   const [showDowntimeForm, setShowDowntimeForm] = useState(false)
   const [showMachineForm, setShowMachineForm] = useState(false)
+  const [detailRuns, setDetailRuns] = useState<ProductionRun[] | null>(null)
 
   const canWrite = useAuthStore((s) => s.hasRole('admin', 'production_supervisor'))
   const isAdmin = useAuthStore((s) => s.hasRole('admin'))
@@ -42,7 +44,7 @@ export function ProductionPage() {
           '*, machines(machine_code, name, stage), finished_goods:finished_goods!production_runs_finished_good_id_fkey(product_name, stage), input_product:finished_goods!production_runs_input_product_id_fkey(product_name), production_run_materials(quantity_kg, raw_materials(name))'
         )
         .order('run_date', { ascending: false })
-        .limit(50),
+        .limit(100),
       supabase
         .from('machine_downtime')
         .select('*, machines(machine_code, name)')
@@ -93,6 +95,19 @@ export function ProductionPage() {
     0
   )
 
+  // Brands printed in one run are stored as separate rows that share a run_group_id;
+  // show them together as a single run.
+  const runGroups = useMemo(() => {
+    const map = new Map<string, ProductionRun[]>()
+    for (const r of runs) {
+      const key = r.run_group_id ?? r.id
+      const g = map.get(key)
+      if (g) g.push(r)
+      else map.set(key, [r])
+    }
+    return [...map.values()].map((g) => [...g].sort((a, b) => a.created_at.localeCompare(b.created_at)))
+  }, [runs])
+
   const tabs = [
     { id: 'runs' as const, label: 'Production Runs' },
     { id: 'downtime' as const, label: 'Downtime Log' },
@@ -138,37 +153,58 @@ export function ProductionPage() {
             headers={['Date', 'Shift', 'Machine', 'Operator', 'Product', 'Output', 'Consumed', 'Waste']}
             isEmpty={runs.length === 0}
           >
-            {runs.map((r) => {
+            {runGroups.map((group) => {
+              const r = group[0]
+              const many = group.length > 1
               const isConversion = (r.machines as Machine)?.stage === 'conversion'
+              const productNames = [...new Set(group.map((g) => g.finished_goods?.product_name).filter(Boolean))] as string[]
+              const productLabel =
+                productNames.length === 0
+                  ? '—'
+                  : productNames.length === 1
+                  ? productNames[0]
+                  : `${productNames[0]} +${productNames.length - 1} more`
+              const outputTotal = group.reduce((sum, g) => sum + Number(g.output_quantity), 0)
+              const wasteTotal = group.reduce((sum, g) => sum + Number(g.waste_quantity), 0)
               const materialsTotal = (r.production_run_materials || []).reduce((s, m) => s + m.quantity_kg, 0)
               const consumedLabel = isConversion
-                ? `${formatNumber(r.input_quantity_consumed)} ${(r.input_product as FinishedGood)?.product_name || 'input'}`
+                ? many
+                  ? `${formatNumber(group.reduce((sum, g) => sum + Number(g.input_quantity_consumed), 0))} semi-finished`
+                  : `${formatNumber(r.input_quantity_consumed)} ${(r.input_product as FinishedGood)?.product_name || 'input'}`
                 : `${formatNumber(materialsTotal)} kg materials`
+              const open = () => setDetailRuns(group)
               return (
                 <TableRow
-                  key={r.id}
+                  key={r.run_group_id ?? r.id}
+                  onClick={open}
                   cells={[
                     formatDate(r.run_date),
                     SHIFT_LABELS[r.shift],
                     (r.machines as Machine)?.machine_code || '—',
                     r.operator_name,
-                    r.finished_goods?.product_name || '—',
-                    `${formatNumber(r.output_quantity)} ${r.output_unit}`,
+                    <span>
+                      {productLabel}
+                      {many && <Badge variant="info">{group.length} brands</Badge>}
+                    </span>,
+                    `${formatNumber(outputTotal)} ${r.output_unit}`,
                     consumedLabel,
-                    `${formatNumber(r.waste_quantity)} kg`,
+                    `${formatNumber(wasteTotal)} kg`,
                   ]}
                   mobileCard={
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between font-medium">
                         <span>{formatDate(r.run_date)} · {SHIFT_LABELS[r.shift]}</span>
-                        <span>{formatNumber(r.output_quantity)} {r.output_unit}</span>
+                        <span>{formatNumber(outputTotal)} {r.output_unit}</span>
                       </div>
                       <p className="text-xs text-slate-500">
                         {(r.machines as Machine)?.name} · {r.operator_name}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {r.finished_goods?.product_name || '—'} {isConversion ? `← ${(r.input_product as FinishedGood)?.product_name || 'input'}` : ''}
+                        {productLabel}
+                        {many ? ` · ${group.length} brands` : ''}
+                        {!many && isConversion ? ` ← ${(r.input_product as FinishedGood)?.product_name || 'input'}` : ''}
                       </p>
+                      <p className="text-xs text-brand-700">Tap for details</p>
                     </div>
                   }
                 />
@@ -317,6 +353,8 @@ export function ProductionPage() {
           }}
         />
       )}
+
+      {detailRuns && <ProductionRunDetailModal rows={detailRuns} onClose={() => setDetailRuns(null)} />}
 
       {showMachineForm && (
         <MachineFormModal
