@@ -43,20 +43,39 @@ export function ResponsiveTable({
 export function TableRow({
   cells,
   mobileCard,
+  onClick,
 }: {
   cells: ReactNode[]
   mobileCard: ReactNode
+  /** When set, the whole row is clickable (and reachable with the keyboard). */
+  onClick?: () => void
 }) {
+  const clickable = onClick
+    ? {
+        onClick,
+        role: 'button' as const,
+        tabIndex: 0,
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onClick()
+          }
+        },
+      }
+    : {}
+
   return (
     <>
-      <tr className="hidden md:table-row hover:bg-slate-50">
+      <tr className={`hidden md:table-row hover:bg-slate-50 ${onClick ? 'cursor-pointer' : ''}`} {...clickable}>
         {cells.map((cell, i) => (
           <td key={i} className="px-4 py-3 text-slate-700">
             {cell}
           </td>
         ))}
       </tr>
-      <div className="md:hidden card p-4">{mobileCard}</div>
+      <div className={`md:hidden card p-4 ${onClick ? 'cursor-pointer active:bg-slate-50' : ''}`} {...clickable}>
+        {mobileCard}
+      </div>
     </>
   )
 }
